@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resizable & Draggable Textbox Shape</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    .box {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background-color: lightblue;
+      box-sizing: border-box;
+      border: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .selected {
+      border-color: red;
+    }
+    .resizer {
+      width: 10px;
+      height: 10px;
+      background: #000;
+      position: absolute;
+    }
+    .resizer.right {
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: ew-resize;
+    }
+    .resizer.bottom {
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: ns-resize;
+    }
+    .resizer.corner {
+      bottom: -5px;
+      right: -5px;
+      cursor: se-resize;
+    }
+    .hide-resizers .resizer {
+      display: none;
+    }
+    .box input.textbox {
+      width: 90%;
+      border: none;
+      background: transparent;
+      text-align: center;
+      font-size: 1rem;
+    }
+    #coords {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+    }
+    #control-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border: 1px solid #ccc;
+      width: 200px;
+    }
+    #control-panel label {
+      display: block;
+      margin: 5px 0 2px;
+    }
+    #control-panel input[type="number"],
+    #control-panel input[type="text"],
+    #control-panel input[type="color"],
+    #control-panel button {
+      width: 100%;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+    #resizerToggle {
+      margin-top: 10px;
+    }
+    .font-size-controls {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .font-size-controls button {
+      width: 30%;
+      font-weight: bold;
+    }
+    .action-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .action-buttons button {
+      width: 48%;
+    }
+    #keyboard-shortcuts {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+      font-size: 12px;
+    }
+    #keyboard-shortcuts ul {
+      margin: 5px 0;
+      padding-left: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="coords">X: 0, Y: 0</div>
+    <div id="control-panel">
+      <label for="inputX">X Position</label>
+      <input type="number" id="inputX">
+      <label for="inputY">Y Position</label>
+      <input type="number" id="inputY">
+      <label for="inputWidth">Width</label>
+      <input type="number" id="inputWidth">
+      <label for="inputHeight">Height</label>
+      <input type="number" id="inputHeight">
+      <label for="inputText">Text</label>
+      <input type="text" id="inputText">
+      <label for="inputColor">Color</label>
+      <input type="color" id="inputColor" value="#add8e6">
+      <label for="inputFontSize">Font Size</label>
+      <div class="font-size-controls">
+        <button id="decreaseFontBtn">-</button>
+        <input type="number" id="inputFontSize" min="8" max="72" value="16">
+        <button id="increaseFontBtn">+</button>
+      </div>
+      <div class="action-buttons">
+        <button id="addBoxBtn">Add Box</button>
+        <button id="duplicateBoxBtn">Duplicate</button>
+      </div>
+      <label><input type="checkbox" id="resizerToggle" checked> Show Resizers</label>
+    </div>
+    <div id="keyboard-shortcuts">
+      <b>Keyboard Shortcuts:</b>
+      <ul>
+        <li>Del - Delete selected box</li>
+        <li>Ctrl+D - Duplicate selected box</li>
+        <li>Esc - Clear text</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const container = document.getElementById("container");
+    const coords = document.getElementById("coords");
+    const inputX = document.getElementById("inputX");
+    const inputY = document.getElementById("inputY");
+    const inputWidth = document.getElementById("inputWidth");
+    const inputHeight = document.getElementById("inputHeight");
+    const inputText = document.getElementById("inputText");
+    const inputColor = document.getElementById("inputColor");
+    const inputFontSize = document.getElementById("inputFontSize");
+    const decreaseFontBtn = document.getElementById("decreaseFontBtn");
+    const increaseFontBtn = document.getElementById("increaseFontBtn");
+    const addBoxBtn = document.getElementById("addBoxBtn");
+    const duplicateBoxBtn = document.getElementById("duplicateBoxBtn");
+    const resizerToggle = document.getElementById("resizerToggle");
+
+    let selectedBox = null;
+    let isDragging = false;
+    let offsetX = 0, offsetY = 0;
+    let isResizing = false, currentResizer;
+    let originalWidth, originalHeight, originalX, originalY;
+
+    function createBox(x = 100, y = 100, width = 200, height = 200, text = "", color = "#add8e6", fontSize = 16) {
+      const box = document.createElement("div");
+      box.classList.add("box");
+      box.style.left = `${x}px`;
+      box.style.top = `${y}px`;
+      box.style.width = `${width}px`;
+      box.style.height = `${height}px`;
+      box.style.backgroundColor = color;
+
+      const textInput = document.createElement("input");
+      textInput.className = "textbox";
+      textInput.type = "text";
+      textInput.value = text;
+      textInput.style.fontSize = `${fontSize}px`;
+      textInput.addEventListener("input", () => {
+        if (box === selectedBox) inputText.value = textInput.value;
+        saveState();
+      });
+
+      ["right", "bottom", "corner"].forEach(pos => {
+        const resizer = document.createElement("div");
+        resizer.classList.add("resizer", pos);
+        box.appendChild(resizer);
+      });
+
+      box.appendChild(textInput);
+
+      box.addEventListener("mousedown", (e) => {
+        if (!e.target.classList.contains("resizer")) {
+          selectBox(box);
+          isDragging = true;
+          offsetX = e.clientX - box.offsetLeft;
+          offsetY = e.clientY - box.offsetTop;
+        }
+      });
+
+      // Add right-click to delete box
+      box.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        if (confirm("Delete this box?")) {
+          if (box === selectedBox) selectedBox = null;
+          box.remove();
+          saveState();
+        }
+      });
+
+      // Add double-click to clear text
+      box.addEventListener("dblclick", (e) => {
+        const textInput = box.querySelector(".textbox");
+        textInput.value = "";
+        if (box === selectedBox) inputText.value = "";
+        saveState();
+        e.stopPropagation();
+      });
+
+      const resizers = box.querySelectorAll(".resizer");
+      resizers.forEach(resizer => {
+        resizer.addEventListener("mousedown", (e) => {
+          currentResizer = resizer;
+          originalWidth = box.offsetWidth;
+          originalHeight = box.offsetHeight;
+          originalX = e.clientX;
+          originalY = e.clientY;
+          isResizing = true;
+          e.stopPropagation();
+        });
+      });
+
+      box.addEventListener("click", () => selectBox(box));
+      container.appendChild(box);
+      selectBox(box);
+      updateResizerVisibility();
+      saveState();
+      
+      return box;
+    }
+
+    function duplicateBox() {
+      if (!selectedBox) return;
+      
+      const textInput = selectedBox.querySelector(".textbox");
+      const fontSize = parseInt(textInput.style.fontSize) || 16;
+      
+      // Create a new box with a slight offset from the original
+      const newBox = createBox(
+        selectedBox.offsetLeft + 20,
+        selectedBox.offsetTop + 20,
+        selectedBox.offsetWidth,
+        selectedBox.offsetHeight,
+        textInput.value,
+        selectedBox.style.backgroundColor,
+        fontSize
+      );
+      
+      selectBox(newBox);
+    }
+
+    function deleteSelectedBox() {
+      if (!selectedBox) return;
+      
+      selectedBox.remove();
+      selectedBox = null;
+      saveState();
+    }
+
+    function clearSelectedBoxText() {
+      if (!selectedBox) return;
+      
+      const textInput = selectedBox.querySelector(".textbox");
+      textInput.value = "";
+      inputText.value = "";
+      saveState();
+    }
+
+    function selectBox(box) {
+      if (selectedBox) selectedBox.classList.remove("selected");
+      selectedBox = box;
+      selectedBox.classList.add("selected");
+      updateControls();
+    }
+
+    function updateControls() {
+      if (!selectedBox) return;
+      const textInput = selectedBox.querySelector(".textbox");
+      inputX.value = selectedBox.offsetLeft;
+      inputY.value = selectedBox.offsetTop;
+      inputWidth.value = selectedBox.offsetWidth;
+      inputHeight.value = selectedBox.offsetHeight;
+      inputText.value = textInput.value;
+      inputColor.value = rgbToHex(selectedBox.style.backgroundColor);
+      
+      // Get font size (remove 'px' and convert to number)
+      const currentFontSize = parseInt(textInput.style.fontSize) || 16;
+      inputFontSize.value = currentFontSize;
+      
+      coords.textContent = `X: ${selectedBox.offsetLeft}, Y: ${selectedBox.offsetTop}`;
+    }
+
+    function updateResizerVisibility() {
+      document.querySelectorAll(".box").forEach(box => {
+        box.classList.toggle("hide-resizers", !resizerToggle.checked);
+      });
+    }
+
+    function saveState() {
+      const state = Array.from(document.querySelectorAll(".box")).map(box => {
+        const textInput = box.querySelector(".textbox");
+        const fontSize = parseInt(textInput.style.fontSize) || 16;
+        return {
+          x: box.offsetLeft,
+          y: box.offsetTop,
+          width: box.offsetWidth,
+          height: box.offsetHeight,
+          text: textInput.value,
+          color: rgbToHex(box.style.backgroundColor),
+          fontSize: fontSize
+        };
+      });
+      localStorage.setItem("shapeState", JSON.stringify(state));
+    }
+
+    function loadState() {
+      const state = JSON.parse(localStorage.getItem("shapeState")) || [];
+      state.forEach(s => createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16));
+    }
+
+    function rgbToHex(rgb) {
+      const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
+      return result ? "#" +
+        (1 << 24 | result[1] << 16 | result[2] << 8 | result[3] << 0).toString(16).slice(1) : rgb;
+    }
+
+    document.addEventListener("mousemove", (e) => {
+      if (isDragging && selectedBox) {
+        selectedBox.style.left = `${e.clientX - offsetX}px`;
+        selectedBox.style.top = `${e.clientY - offsetY}px`;
+        updateControls();
+        saveState();
+      } else if (isResizing && selectedBox) {
+        if (currentResizer.classList.contains("right")) {
+          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
+        } else if (currentResizer.classList.contains("bottom")) {
+          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+        } else if (currentResizer.classList.contains("corner")) {
+          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
+          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+        }
+        updateControls();
+        saveState();
+      }
+    });
+
+    document.addEventListener("mouseup", () => {
+      isDragging = false;
+      isResizing = false;
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      // Ignore keyboard events when typing in inputs
+      if (e.target.tagName === "INPUT") return;
+      
+      if (e.key === "Delete") {
+        deleteSelectedBox();
+      } else if (e.key === "d" && e.ctrlKey) {
+        e.preventDefault(); // Prevent browser's "Bookmark this page" shortcut
+        duplicateBox();
+      } else if (e.key === "Escape") {
+        clearSelectedBoxText();
+      }
+    });
+
+    [inputX, inputY, inputWidth, inputHeight].forEach(input => {
+      input.addEventListener("input", () => {
+        if (!selectedBox) return;
+        selectedBox.style.left = `${parseInt(inputX.value)}px`;
+        selectedBox.style.top = `${parseInt(inputY.value)}px`;
+        selectedBox.style.width = `${parseInt(inputWidth.value)}px`;
+        selectedBox.style.height = `${parseInt(inputHeight.value)}px`;
+        updateControls();
+        saveState();
+      });
+    });
+
+    inputText.addEventListener("input", () => {
+      if (!selectedBox) return;
+      const textInput = selectedBox.querySelector(".textbox");
+      textInput.value = inputText.value;
+      saveState();
+    });
+
+    inputColor.addEventListener("input", () => {
+      if (!selectedBox) return;
+      selectedBox.style.backgroundColor = inputColor.value;
+      saveState();
+    });
+
+    // Font size controls
+    inputFontSize.addEventListener("input", () => {
+      if (!selectedBox) return;
+      const textInput = selectedBox.querySelector(".textbox");
+      const newSize = parseInt(inputFontSize.value) || 16;
+      textInput.style.fontSize = `${newSize}px`;
+      saveState();
+    });
+
+    decreaseFontBtn.addEventListener("click", () => {
+      if (!selectedBox) return;
+      const textInput = selectedBox.querySelector(".textbox");
+      const currentSize = parseInt(textInput.style.fontSize) || 16;
+      const newSize = Math.max(8, currentSize - 2);
+      textInput.style.fontSize = `${newSize}px`;
+      inputFontSize.value = newSize;
+      saveState();
+    });
+
+    increaseFontBtn.addEventListener("click", () => {
+      if (!selectedBox) return;
+      const textInput = selectedBox.querySelector(".textbox");
+      const currentSize = parseInt(textInput.style.fontSize) || 16;
+      const newSize = Math.min(72, currentSize + 2);
+      textInput.style.fontSize = `${newSize}px`;
+      inputFontSize.value = newSize;
+      saveState();
+    });
+
+    addBoxBtn.addEventListener("click", () => createBox());
+    duplicateBoxBtn.addEventListener("click", duplicateBox);
+    resizerToggle.addEventListener("change", updateResizerVisibility);
+
+    loadState();
+  </script>
+</body>
+</html>
