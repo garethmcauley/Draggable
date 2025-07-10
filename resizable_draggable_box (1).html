@@ -203,7 +203,7 @@
         <button id="addBoxBtn">Add Box</button>
         <button id="duplicateBoxBtn">Duplicate</button>
       </div>
-      <label><input type="checkbox" id="resizerToggle" checked> Show Resizers</label>
+      <label><input type="checkbox" id="resizerToggle"> Show Resizers</label>
     </div>
     <div id="keyboard-shortcuts">
       <b>Keyboard Shortcuts:</b>
@@ -274,6 +274,9 @@
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
       box.style.backgroundColor = color;
+      
+      // Add hide-resizers class by default as the checkbox is unchecked
+      box.classList.add("hide-resizers");
 
       const textInput = document.createElement("input");
       textInput.className = "textbox";
