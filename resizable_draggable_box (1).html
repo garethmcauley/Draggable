@@ -77,7 +77,9 @@
       background: rgba(255,255,255,0.9);
       padding: 10px;
       border: 1px solid #ccc;
-      width: 200px;
+      width: 220px;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     #control-panel label {
       display: block;
@@ -163,6 +165,54 @@
       border: 1px solid #ccc;
       border-radius: 3px;
     }
+    .template-section {
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+    .template-section h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+    .template-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .template-actions button {
+      width: 48%;
+    }
+    .template-list {
+      margin-top: 8px;
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+    .template-item {
+      padding: 5px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+    }
+    .template-item:hover {
+      background-color: #f0f0f0;
+    }
+    .template-item-actions {
+      display: flex;
+    }
+    .template-item-actions button {
+      padding: 2px 5px;
+      margin-left: 3px;
+      font-size: 10px;
+      width: auto;
+    }
+    #templateNameInput {
+      margin-bottom: 8px;
+    }
   </style>
 </head>
 <body>
@@ -204,6 +254,19 @@
         <button id="duplicateBoxBtn">Duplicate</button>
       </div>
       <label><input type="checkbox" id="resizerToggle"> Show Resizers</label>
+      
+      <!-- Template system -->
+      <div class="template-section">
+        <h3>Templates</h3>
+        <input type="text" id="templateNameInput" placeholder="Template name">
+        <div class="template-actions">
+          <button id="saveTemplateBtn">Save Template</button>
+          <button id="clearAllBtn">Clear All</button>
+        </div>
+        <div class="template-list" id="templateList">
+          <!-- Template list will be populated here -->
+        </div>
+      </div>
     </div>
     <div id="keyboard-shortcuts">
       <b>Keyboard Shortcuts:</b>
@@ -234,6 +297,10 @@
     const addBoxBtn = document.getElementById("addBoxBtn");
     const duplicateBoxBtn = document.getElementById("duplicateBoxBtn");
     const resizerToggle = document.getElementById("resizerToggle");
+    const templateNameInput = document.getElementById("templateNameInput");
+    const saveTemplateBtn = document.getElementById("saveTemplateBtn");
+    const clearAllBtn = document.getElementById("clearAllBtn");
+    const templateList = document.getElementById("templateList");
 
     let selectedBox = null;
     let isDragging = false;
@@ -241,6 +308,7 @@
     let isResizing = false, currentResizer;
     let originalWidth, originalHeight, originalX, originalY;
     let currentOpacity = 100;
+    let currentTemplate = "default";
     
     // Color presets
     const presetColors = [
@@ -474,7 +542,12 @@
         box.classList.toggle("hide-resizers", !resizerToggle.checked);
       });
     }
-
+    
+    // Template management functions
+    function getTemplateKey(templateName) {
+      return `shapeTemplate_${templateName}`;
+    }
+    
     function saveState() {
       const state = Array.from(document.querySelectorAll(".box")).map(box => {
         const textInput = box.querySelector(".textbox");
@@ -489,12 +562,149 @@
           fontSize: fontSize
         };
       });
-      localStorage.setItem("shapeState", JSON.stringify(state));
+      
+      // Save to current template
+      localStorage.setItem(getTemplateKey(currentTemplate), JSON.stringify(state));
+      
+      // For backward compatibility
+      if (currentTemplate === "default") {
+        localStorage.setItem("shapeState", JSON.stringify(state));
+      }
+    }
+
+    function loadTemplate(templateName) {
+      // Clear existing boxes
+      clearAllBoxes();
+      
+      currentTemplate = templateName;
+      
+      // Load the state for the selected template
+      const key = getTemplateKey(templateName);
+      const state = JSON.parse(localStorage.getItem(key)) || [];
+      
+      // Create boxes from the state
+      state.forEach(s => createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16));
+      
+      // Update UI
+      updateTemplateList();
+    }
+    
+    function saveTemplate() {
+      let templateName = templateNameInput.value.trim();
+      
+      if (!templateName) {
+        alert("Please enter a template name");
+        return;
+      }
+      
+      // Update current template name and save state
+      currentTemplate = templateName;
+      saveState();
+      
+      // Update template list in UI
+      updateTemplateList();
+      
+      // Clear the input
+      templateNameInput.value = "";
+    }
+    
+    function deleteTemplate(templateName) {
+      if (confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
+        localStorage.removeItem(getTemplateKey(templateName));
+        
+        // If we deleted the current template, switch to default
+        if (currentTemplate === templateName) {
+          currentTemplate = "default";
+          loadTemplate("default");
+        }
+        
+        updateTemplateList();
+      }
+    }
+    
+    function clearAllBoxes() {
+      // Remove all boxes from the container
+      const boxes = document.querySelectorAll(".box");
+      boxes.forEach(box => box.remove());
+      selectedBox = null;
+    }
+    
+    function updateTemplateList() {
+      // Clear existing list
+      templateList.innerHTML = "";
+      
+      // Get all template keys
+      const templates = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith("shapeTemplate_")) {
+          templates.push(key.replace("shapeTemplate_", ""));
+        }
+      }
+      
+      // Add "default" if it doesn't exist
+      if (!templates.includes("default") && localStorage.getItem("shapeState")) {
+        templates.push("default");
+        localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
+      }
+      
+      // Sort templates alphabetically
+      templates.sort();
+      
+      // Add each template to the list
+      templates.forEach(template => {
+        const item = document.createElement("div");
+        item.className = "template-item";
+        
+        // Mark current template
+        if (template === currentTemplate) {
+          item.style.fontWeight = "bold";
+        }
+        
+        const templateNameSpan = document.createElement("span");
+        templateNameSpan.textContent = template;
+        templateNameSpan.addEventListener("click", () => loadTemplate(template));
+        item.appendChild(templateNameSpan);
+        
+        // Add delete button
+        if (template !== "default") {
+          const actions = document.createElement("div");
+          actions.className = "template-item-actions";
+          
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "×";
+          deleteBtn.title = "Delete this template";
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            deleteTemplate(template);
+          });
+          
+          actions.appendChild(deleteBtn);
+          item.appendChild(actions);
+        }
+        
+        templateList.appendChild(item);
+      });
     }
 
     function loadState() {
-      const state = JSON.parse(localStorage.getItem("shapeState")) || [];
-      state.forEach(s => createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16));
+      // First check for templates
+      let templatesExist = false;
+      for (let i = 0; i < localStorage.length; i++) {
+        if (localStorage.key(i).startsWith("shapeTemplate_")) {
+          templatesExist = true;
+          break;
+        }
+      }
+      
+      // If no templates exist, check for legacy state
+      if (!templatesExist && localStorage.getItem("shapeState")) {
+        // Migrate old state to default template
+        localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
+      }
+      
+      // Load default template
+      loadTemplate("default");
     }
 
     function rgbToHex(rgb) {
@@ -613,10 +823,21 @@
       saveState();
     });
 
+    // Box management
     addBoxBtn.addEventListener("click", () => createBox());
     duplicateBoxBtn.addEventListener("click", duplicateBox);
     resizerToggle.addEventListener("change", updateResizerVisibility);
-
+    
+    // Template management
+    saveTemplateBtn.addEventListener("click", saveTemplate);
+    clearAllBtn.addEventListener("click", () => {
+      if (confirm("Are you sure you want to clear all boxes?")) {
+        clearAllBoxes();
+        saveState();
+      }
+    });
+    
+    // Initialize templates and load the state
     loadState();
   </script>
 </body>
