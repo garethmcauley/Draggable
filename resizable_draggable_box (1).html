@@ -27,7 +27,15 @@
       justify-content: center;
     }
     .selected {
-      border-color: red;
+      border-color: blue;
+      box-shadow: 0 0 8px rgba(0, 0, 255, 0.5);
+    }
+    .white-bg {
+      background-color: white !important;
+    }
+    .white-bg.selected {
+      border-color: #0066ff;
+      box-shadow: 0 0 8px rgba(0, 102, 255, 0.5);
     }
     .resizer {
       width: 10px;
@@ -88,6 +96,7 @@
     #control-panel input[type="number"],
     #control-panel input[type="text"],
     #control-panel input[type="color"],
+    #control-panel input[type="file"],
     #control-panel button {
       width: 100%;
       padding: 4px;
@@ -213,6 +222,50 @@
     #templateNameInput {
       margin-bottom: 8px;
     }
+    .export-import-section {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
+    }
+    .export-import-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .export-import-buttons button {
+      width: 48%;
+    }
+    #importFileInput {
+      display: none;
+    }
+    .file-input-label {
+      display: inline-block;
+      padding: 5px 10px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      cursor: pointer;
+      text-align: center;
+      margin-top: 8px;
+    }
+    .file-input-label:hover {
+      background: #e9e9e9;
+    }
+    #notificationArea {
+      position: fixed;
+      bottom: 20px;
+      right: 240px;
+      padding: 10px 15px;
+      background-color: rgba(0, 128, 0, 0.8);
+      color: white;
+      border-radius: 5px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .notification-visible {
+      opacity: 1 !important;
+    }
   </style>
 </head>
 <body>
@@ -266,6 +319,17 @@
         <div class="template-list" id="templateList">
           <!-- Template list will be populated here -->
         </div>
+        
+        <!-- Export/Import section -->
+        <div class="export-import-section">
+          <h3>Export/Import</h3>
+          <div class="export-import-buttons">
+            <button id="exportBtn">Export XML</button>
+            <button id="importBtn">Import XML</button>
+          </div>
+          <input type="file" id="importFileInput" accept=".xml">
+          <label for="importFileInput" class="file-input-label" id="fileInputLabel">Select XML file</label>
+        </div>
       </div>
     </div>
     <div id="keyboard-shortcuts">
@@ -276,6 +340,7 @@
         <li>Esc - Clear text</li>
       </ul>
     </div>
+    <div id="notificationArea"></div>
   </div>
 
   <script>
@@ -301,6 +366,11 @@
     const saveTemplateBtn = document.getElementById("saveTemplateBtn");
     const clearAllBtn = document.getElementById("clearAllBtn");
     const templateList = document.getElementById("templateList");
+    const exportBtn = document.getElementById("exportBtn");
+    const importBtn = document.getElementById("importBtn");
+    const importFileInput = document.getElementById("importFileInput");
+    const fileInputLabel = document.getElementById("fileInputLabel");
+    const notificationArea = document.getElementById("notificationArea");
 
     let selectedBox = null;
     let isDragging = false;
@@ -345,6 +415,12 @@
       
       // Add hide-resizers class by default as the checkbox is unchecked
       box.classList.add("hide-resizers");
+      
+      // Add white-bg class if the background color is white
+      if (color === "#ffffff" || color === "rgb(255, 255, 255)" || color === "rgba(255, 255, 255, 1)" || 
+          (color.startsWith("rgba(") && color.includes("255, 255, 255"))) {
+        box.classList.add("white-bg");
+      }
 
       const textInput = document.createElement("input");
       textInput.className = "textbox";
@@ -534,7 +610,15 @@
       if (!box) return;
       const hexColor = inputColor.value;
       const opacity = opacityControl.value / 100;
-      box.style.backgroundColor = hexToRGBA(hexColor, opacity);
+      const rgba = hexToRGBA(hexColor, opacity);
+      box.style.backgroundColor = rgba;
+      
+      // Update white-bg class based on the new color
+      if (hexColor === "#ffffff" && opacity >= 0.9) {
+        box.classList.add("white-bg");
+      } else {
+        box.classList.remove("white-bg");
+      }
     }
 
     function updateResizerVisibility() {
@@ -549,7 +633,19 @@
     }
     
     function saveState() {
-      const state = Array.from(document.querySelectorAll(".box")).map(box => {
+      const state = getStateObject();
+      
+      // Save to current template
+      localStorage.setItem(getTemplateKey(currentTemplate), JSON.stringify(state));
+      
+      // For backward compatibility
+      if (currentTemplate === "default") {
+        localStorage.setItem("shapeState", JSON.stringify(state));
+      }
+    }
+    
+    function getStateObject() {
+      return Array.from(document.querySelectorAll(".box")).map(box => {
         const textInput = box.querySelector(".textbox");
         const fontSize = parseInt(textInput.style.fontSize) || 16;
         return {
@@ -559,17 +655,10 @@
           height: box.offsetHeight,
           text: textInput.value,
           color: box.style.backgroundColor,
-          fontSize: fontSize
+          fontSize: fontSize,
+          isWhite: box.classList.contains("white-bg")
         };
       });
-      
-      // Save to current template
-      localStorage.setItem(getTemplateKey(currentTemplate), JSON.stringify(state));
-      
-      // For backward compatibility
-      if (currentTemplate === "default") {
-        localStorage.setItem("shapeState", JSON.stringify(state));
-      }
     }
 
     function loadTemplate(templateName) {
@@ -582,11 +671,23 @@
       const key = getTemplateKey(templateName);
       const state = JSON.parse(localStorage.getItem(key)) || [];
       
-      // Create boxes from the state
-      state.forEach(s => createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16));
+      loadBoxesFromState(state);
       
       // Update UI
       updateTemplateList();
+    }
+    
+    function loadBoxesFromState(state) {
+      // Create boxes from the state
+      state.forEach(s => {
+        const box = createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16);
+        // Ensure white background boxes are properly marked
+        if (s.isWhite || (s.color && 
+            (s.color === "#ffffff" || s.color === "rgb(255, 255, 255)" || s.color === "rgba(255, 255, 255, 1)" ||
+            (s.color.startsWith("rgba(") && s.color.includes("255, 255, 255"))))) {
+          box.classList.add("white-bg");
+        }
+      });
     }
     
     function saveTemplate() {
@@ -606,6 +707,9 @@
       
       // Clear the input
       templateNameInput.value = "";
+      
+      // Show notification
+      showNotification(`Template "${templateName}" saved`);
     }
     
     function deleteTemplate(templateName) {
@@ -705,6 +809,124 @@
       
       // Load default template
       loadTemplate("default");
+    }
+    
+    // XML Export/Import functions
+    function exportTemplateToXML() {
+      // Get currently selected template data
+      const key = getTemplateKey(currentTemplate);
+      const state = JSON.parse(localStorage.getItem(key)) || [];
+      
+      // Create a simple XML string directly
+      let xmlString = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      xmlString += `<template name="${currentTemplate}">\n`;
+      
+      // Add boxes
+      state.forEach(box => {
+        xmlString += `  <box x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" `;
+        xmlString += `color="${box.color}" fontSize="${box.fontSize || 16}" `;
+        xmlString += `isWhite="${box.isWhite || false}">\n`;
+        xmlString += `    <text>${escapeXML(box.text)}</text>\n`;
+        xmlString += `  </box>\n`;
+      });
+      
+      // Close template
+      xmlString += `</template>`;
+      
+      // Create downloadable link
+      const blob = new Blob([xmlString], {type: 'text/xml'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentTemplate}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      // Show notification
+      showNotification(`Template "${currentTemplate}" exported to XML`);
+    }
+    
+    // Helper function to escape XML special characters
+    function escapeXML(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+    
+    function importTemplateFromXML(file) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        try {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+          
+          // Check for parsing errors
+          const parserError = xmlDoc.querySelector("parsererror");
+          if (parserError) {
+            throw new Error("XML parsing error");
+          }
+          
+          // Get template name
+          const templateName = xmlDoc.documentElement.getAttribute("name") || "imported_template";
+          
+          // Parse boxes
+          const boxes = [];
+          const boxElements = xmlDoc.getElementsByTagName("box");
+          
+          for (let i = 0; i < boxElements.length; i++) {
+            const boxElement = boxElements[i];
+            
+            const textElement = boxElement.getElementsByTagName("text")[0];
+            const text = textElement ? textElement.textContent : "";
+            
+            boxes.push({
+              x: parseInt(boxElement.getAttribute("x")) || 100,
+              y: parseInt(boxElement.getAttribute("y")) || 100,
+              width: parseInt(boxElement.getAttribute("width")) || 200,
+              height: parseInt(boxElement.getAttribute("height")) || 200,
+              color: boxElement.getAttribute("color") || "rgba(173, 216, 230, 1)",
+              fontSize: parseInt(boxElement.getAttribute("fontSize")) || 16,
+              isWhite: boxElement.getAttribute("isWhite") === "true",
+              text: text
+            });
+          }
+          
+          // Save imported template
+          currentTemplate = templateName;
+          localStorage.setItem(getTemplateKey(templateName), JSON.stringify(boxes));
+          
+          // Clear and load the imported template
+          clearAllBoxes();
+          loadBoxesFromState(boxes);
+          
+          // Update UI
+          updateTemplateList();
+          
+          // Show notification
+          showNotification(`Template "${templateName}" imported successfully`);
+          
+        } catch (error) {
+          console.error("Import error:", error);
+          alert("Error importing template. Please check if the XML file is valid.");
+        }
+      };
+      
+      reader.readAsText(file);
+    }
+    
+    function showNotification(message) {
+      notificationArea.textContent = message;
+      notificationArea.classList.add("notification-visible");
+      
+      setTimeout(() => {
+        notificationArea.classList.remove("notification-visible");
+      }, 3000);
     }
 
     function rgbToHex(rgb) {
@@ -834,6 +1056,19 @@
       if (confirm("Are you sure you want to clear all boxes?")) {
         clearAllBoxes();
         saveState();
+      }
+    });
+    
+    // Export/Import functionality
+    exportBtn.addEventListener("click", exportTemplateToXML);
+    importBtn.addEventListener("click", () => importFileInput.click());
+    importFileInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        const file = e.target.files[0];
+        fileInputLabel.textContent = file.name;
+        importTemplateFromXML(file);
+        // Reset file input so the same file can be selected again
+        e.target.value = "";
       }
     });
     
