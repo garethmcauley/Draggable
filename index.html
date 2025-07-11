@@ -484,6 +484,9 @@
     });
 
     container.addEventListener("wheel", (e) => {
+      if (controlPanel.contains(e.target)) {
+        return;
+      }
       e.preventDefault();
       const scaleAmount = e.deltaY > 0 ? 0.9 : 1.1;
       const mouseX = e.clientX - container.getBoundingClientRect().left;
@@ -498,7 +501,7 @@
 
       applyTransform();
       updateCoords(e);
-    });
+    }, { passive: false });
 
     function updateCoords(e) {
       const canvasX = (e.clientX - panX) / scale;
