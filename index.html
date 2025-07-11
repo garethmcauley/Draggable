@@ -51,6 +51,9 @@
       border-color: transparent !important;
       box-shadow: none !important;
     }
+    .hide-ui-mode .resizer {
+      display: none !important;
+    }
     .resizer {
       width: 10px;
       height: 10px;
@@ -382,7 +385,7 @@
         <button id="addBoxBtn">Add Box</button>
         <button id="duplicateBoxBtn">Duplicate</button>
       </div>
-      <label><input type="checkbox" id="resizerToggle"> Show Resizers</label>
+      <label style="display: none;"><input type="checkbox" id="resizerToggle" checked> Show Resizers</label>
       
       <!-- Template system -->
       <div class="template-section">
@@ -650,9 +653,6 @@
       box.style.height = `${height}px`;
       box.style.backgroundColor = color;
       
-      // Add hide-resizers class by default as the checkbox is unchecked
-      box.classList.add("hide-resizers");
-      
       // Add white-bg class if the background color is white
       if (color === "#ffffff" || color === "rgb(255, 255, 255)" || color === "rgba(255, 255, 255, 1)" || 
           (color.startsWith("rgba(") && color.includes("255, 255, 255"))) {
@@ -723,7 +723,6 @@
       box.addEventListener("click", () => selectBox(box));
       canvas.appendChild(box);
       selectBox(box);
-      updateResizerVisibility();
       saveState();
       
       return box;
@@ -767,9 +766,13 @@
     }
 
     function selectBox(box) {
-      if (selectedBox) selectedBox.classList.remove("selected");
+      if (selectedBox) {
+        selectedBox.classList.remove("selected");
+        selectedBox.classList.add("hide-resizers");
+      }
       selectedBox = box;
       selectedBox.classList.add("selected");
+      updateResizerVisibility();
       updateControls();
     }
 
@@ -861,9 +864,9 @@
     }
 
     function updateResizerVisibility() {
-      document.querySelectorAll(".box").forEach(box => {
-        box.classList.toggle("hide-resizers", !resizerToggle.checked);
-      });
+      if (selectedBox) {
+        selectedBox.classList.toggle("hide-resizers", !resizerToggle.checked);
+      }
     }
     
     // Template management functions
