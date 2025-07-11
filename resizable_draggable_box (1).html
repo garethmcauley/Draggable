@@ -37,6 +37,10 @@
       border-color: #0066ff;
       box-shadow: 0 0 8px rgba(0, 102, 255, 0.5);
     }
+    .hide-ui-mode .selected {
+      border-color: transparent !important;
+      box-shadow: none !important;
+    }
     .resizer {
       width: 10px;
       height: 10px;
@@ -77,6 +81,9 @@
       background: rgba(255,255,255,0.8);
       padding: 5px 10px;
       border: 1px solid #ccc;
+    }
+    #coords.hidden {
+      display: none;
     }
     #control-panel {
       position: absolute;
@@ -167,6 +174,9 @@
       padding: 5px 10px;
       border: 1px solid #ccc;
       font-size: 12px;
+    }
+    #keyboard-shortcuts.hidden {
+      display: none;
     }
     #keyboard-shortcuts ul {
       margin: 5px 0;
@@ -376,6 +386,7 @@
     const controlPanelHeader = document.getElementById("control-panel-header");
     const controlPanelToggle = document.getElementById("control-panel-toggle");
     const controlPanelClose = document.getElementById("control-panel-close");
+    const keyboardShortcuts = document.getElementById("keyboard-shortcuts");
     const inputX = document.getElementById("inputX");
     const inputY = document.getElementById("inputY");
     const inputWidth = document.getElementById("inputWidth");
@@ -451,23 +462,29 @@
     });
     
     // Control panel toggle
-    controlPanelToggle.addEventListener("click", () => {
-      controlPanel.classList.toggle("hidden");
+    function toggleUIElements(isHidden) {
+      controlPanel.classList.toggle("hidden", isHidden);
+      keyboardShortcuts.classList.toggle("hidden", isHidden);
+      coords.classList.toggle("hidden", isHidden);
+      container.classList.toggle("hide-ui-mode", isHidden);
+      
       // Save the state
-      localStorage.setItem("controlPanelHidden", controlPanel.classList.contains("hidden"));
+      localStorage.setItem("controlPanelHidden", isHidden);
+    }
+    
+    controlPanelToggle.addEventListener("click", () => {
+      const willBeHidden = !controlPanel.classList.contains("hidden");
+      toggleUIElements(willBeHidden);
     });
     
     controlPanelClose.addEventListener("click", () => {
-      controlPanel.classList.add("hidden");
-      localStorage.setItem("controlPanelHidden", "true");
+      toggleUIElements(true);
     });
     
     // Load control panel visibility state
     function loadControlPanelState() {
       const isHidden = localStorage.getItem("controlPanelHidden") === "true";
-      if (isHidden) {
-        controlPanel.classList.add("hidden");
-      }
+      toggleUIElements(isHidden);
       
       // Load position if saved
       const left = localStorage.getItem("controlPanelLeft");
