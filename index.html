@@ -428,7 +428,6 @@
       <ul>
         <li>Del - Delete selected box</li>
         <li>Ctrl+D - Duplicate selected box</li>
-        <li>Esc - Clear text</li>
       </ul>
     </div>
     <div id="notificationArea"></div>
@@ -480,6 +479,7 @@
     let controlPanelDragging = false;
     let controlPanelOffsetX = 0, controlPanelOffsetY = 0;
     let zIndexCounter = 1;
+    let autoHidden = false;
     
     // Canvas navigation state
     let scale = 1;
@@ -487,6 +487,7 @@
     let panY = 0;
     let isPanning = false;
     let panStartX = 0, panStartY = 0;
+    let hasPanned = false;
 
     function applyTransform() {
       canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
@@ -496,6 +497,7 @@
     container.addEventListener("mousedown", (e) => {
       if (e.target === container || e.target === canvas) {
         isPanning = true;
+        hasPanned = false;
         panStartX = e.clientX - panX;
         panStartY = e.clientY - panY;
         container.style.cursor = "grabbing";
@@ -539,6 +541,7 @@
     
     document.addEventListener("mousemove", (e) => {
       if (isPanning) {
+        hasPanned = true;
         panX = e.clientX - panStartX;
         panY = e.clientY - panStartY;
         applyTransform();
@@ -573,8 +576,15 @@
       }
     });
     
-    document.addEventListener("mouseup", () => {
+    document.addEventListener("mouseup", (e) => {
       if (isPanning) {
+        if (!hasPanned && (e.target === container || e.target === canvas)) {
+          selectBox(null);
+          if (!controlPanel.classList.contains("hidden")) {
+            autoHidden = true;
+            toggleUIElements(true);
+          }
+        }
         isPanning = false;
         container.style.cursor = "default";
       }
@@ -596,10 +606,12 @@
     
     controlPanelToggle.addEventListener("click", () => {
       const willBeHidden = !controlPanel.classList.contains("hidden");
+      autoHidden = false;
       toggleUIElements(willBeHidden);
     });
     
     controlPanelClose.addEventListener("click", () => {
+      autoHidden = false;
       toggleUIElements(true);
     });
     
@@ -709,18 +721,19 @@
       box.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         if (confirm("Delete this box?")) {
-          if (box === selectedBox) selectedBox = null;
+          if (box === selectedBox) {
+            selectBox(null);
+          }
           box.remove();
           saveState();
         }
       });
 
-      // Add double-click to clear text
+      // Add double-click to toggle UI visibility
       box.addEventListener("dblclick", (e) => {
-        const textInput = box.querySelector(".textbox");
-        textInput.value = "";
-        if (box === selectedBox) inputText.value = "";
-        saveState();
+        if (container.classList.contains("hide-ui-mode")) {
+          toggleUIElements(false);
+        }
         e.stopPropagation();
       });
 
@@ -771,31 +784,44 @@
       
       selectedBox.remove();
       selectedBox = null;
-      saveState();
-    }
-
-    function clearSelectedBoxText() {
-      if (!selectedBox) return;
-      
-      const textInput = selectedBox.querySelector(".textbox");
-      textInput.value = "";
-      inputText.value = "";
+      updateControls();
       saveState();
     }
 
     function selectBox(box) {
+      // Deselect old box if it exists
       if (selectedBox) {
         selectedBox.classList.remove("selected");
         selectedBox.classList.add("hide-resizers");
       }
+
       selectedBox = box;
-      selectedBox.classList.add("selected");
-      updateResizerVisibility();
-      updateControls();
+
+      // Select new box if it exists
+      if (selectedBox) {
+        selectedBox.classList.add("selected");
+        updateResizerVisibility(); // This will remove hide-resizers if checkbox is checked
+        updateControls();
+        
+        if (controlPanel.classList.contains("hidden") && autoHidden) {
+            toggleUIElements(false);
+        }
+        autoHidden = false;
+      } else {
+        // Clear controls if no box is selected
+        updateControls();
+      }
     }
 
     function updateControls() {
-      if (!selectedBox) return;
+      if (!selectedBox) {
+        inputX.value = "";
+        inputY.value = "";
+        inputWidth.value = "";
+        inputHeight.value = "";
+        inputText.value = "";
+        return;
+      }
       const textInput = selectedBox.querySelector(".textbox");
       inputX.value = Math.round(parseFloat(selectedBox.style.left));
       inputY.value = Math.round(parseFloat(selectedBox.style.top));
@@ -936,6 +962,9 @@
       
       // Update UI
       updateTemplateList();
+      
+      // Set as last viewed
+      localStorage.setItem("lastViewedTemplate", templateName);
     }
     
     function loadBoxesFromState(state) {
@@ -978,6 +1007,9 @@
       // Update template list in UI
       updateTemplateList();
       
+      // Set as last viewed
+      localStorage.setItem("lastViewedTemplate", templateName);
+
       // Clear the input
       templateNameInput.value = "";
       
@@ -1001,9 +1033,9 @@
         if (currentTemplate === templateName) {
           currentTemplate = "default";
           loadTemplate("default");
+        } else {
+          updateTemplateList();
         }
-        
-        updateTemplateList();
       }
     }
     
@@ -1189,8 +1221,9 @@
         localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
       }
       
-      // Load default template
-      loadTemplate("default");
+      // Load last viewed template or default
+      const lastViewed = localStorage.getItem("lastViewedTemplate") || "default";
+      loadTemplate(lastViewed);
       
       // Load control panel state
       loadControlPanelState();
@@ -1331,8 +1364,6 @@
       } else if (e.key === "d" && e.ctrlKey) {
         e.preventDefault(); // Prevent browser's "Bookmark this page" shortcut
         duplicateBox();
-      } else if (e.key === "Escape") {
-        clearSelectedBoxText();
       }
     });
 
@@ -1343,6 +1374,7 @@
         selectedBox.style.top = `${parseInt(inputY.value)}px`;
         selectedBox.style.width = `${parseInt(inputWidth.value)}px`;
         selectedBox.style.height = `${parseInt(inputHeight.value)}px`;
+        updateControls();
         saveState();
       });
     });
