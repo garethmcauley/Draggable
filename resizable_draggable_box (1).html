@@ -88,6 +88,41 @@
       width: 220px;
       max-height: 90vh;
       overflow-y: auto;
+      z-index: 1000;
+      resize: both;
+      overflow: auto;
+    }
+    #control-panel-header {
+      padding: 5px;
+      cursor: move;
+      background: #f0f0f0;
+      margin: -10px -10px 10px -10px;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #control-panel.hidden {
+      display: none;
+    }
+    #control-panel-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    #control-panel-toggle:hover {
+      background: rgba(240,240,240,0.9);
     }
     #control-panel label {
       display: block;
@@ -258,7 +293,12 @@
 <body>
   <div id="container">
     <div id="coords">X: 0, Y: 0</div>
+    <div id="control-panel-toggle">⚙️</div>
     <div id="control-panel">
+      <div id="control-panel-header">
+        <span>Control Panel</span>
+        <span style="cursor:pointer" id="control-panel-close">✖</span>
+      </div>
       <label for="inputX">X Position</label>
       <input type="number" id="inputX">
       <label for="inputY">Y Position</label>
@@ -332,6 +372,10 @@
   <script>
     const container = document.getElementById("container");
     const coords = document.getElementById("coords");
+    const controlPanel = document.getElementById("control-panel");
+    const controlPanelHeader = document.getElementById("control-panel-header");
+    const controlPanelToggle = document.getElementById("control-panel-toggle");
+    const controlPanelClose = document.getElementById("control-panel-close");
     const inputX = document.getElementById("inputX");
     const inputY = document.getElementById("inputY");
     const inputWidth = document.getElementById("inputWidth");
@@ -364,6 +408,94 @@
     let originalWidth, originalHeight, originalX, originalY;
     let currentOpacity = 100;
     let currentTemplate = "default";
+    let controlPanelDragging = false;
+    let controlPanelOffsetX = 0, controlPanelOffsetY = 0;
+    
+    // Control panel dragging and toggling
+    controlPanelHeader.addEventListener("mousedown", (e) => {
+      if (e.target === controlPanelClose) return;
+      controlPanelDragging = true;
+      controlPanelOffsetX = e.clientX - controlPanel.getBoundingClientRect().left;
+      controlPanelOffsetY = e.clientY - controlPanel.getBoundingClientRect().top;
+    });
+    
+    document.addEventListener("mousemove", (e) => {
+      if (controlPanelDragging) {
+        controlPanel.style.right = "auto"; // Remove right positioning
+        controlPanel.style.left = `${e.clientX - controlPanelOffsetX}px`;
+        controlPanel.style.top = `${e.clientY - controlPanelOffsetY}px`;
+        e.preventDefault();
+      } else if (isDragging && selectedBox) {
+        selectedBox.style.left = `${e.clientX - offsetX}px`;
+        selectedBox.style.top = `${e.clientY - offsetY}px`;
+        updateControls();
+        saveState();
+      } else if (isResizing && selectedBox) {
+        if (currentResizer.classList.contains("right")) {
+          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
+        } else if (currentResizer.classList.contains("bottom")) {
+          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+        } else if (currentResizer.classList.contains("corner")) {
+          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
+          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+        }
+        updateControls();
+        saveState();
+      }
+    });
+    
+    document.addEventListener("mouseup", () => {
+      controlPanelDragging = false;
+      isDragging = false;
+      isResizing = false;
+    });
+    
+    // Control panel toggle
+    controlPanelToggle.addEventListener("click", () => {
+      controlPanel.classList.toggle("hidden");
+      // Save the state
+      localStorage.setItem("controlPanelHidden", controlPanel.classList.contains("hidden"));
+    });
+    
+    controlPanelClose.addEventListener("click", () => {
+      controlPanel.classList.add("hidden");
+      localStorage.setItem("controlPanelHidden", "true");
+    });
+    
+    // Load control panel visibility state
+    function loadControlPanelState() {
+      const isHidden = localStorage.getItem("controlPanelHidden") === "true";
+      if (isHidden) {
+        controlPanel.classList.add("hidden");
+      }
+      
+      // Load position if saved
+      const left = localStorage.getItem("controlPanelLeft");
+      const top = localStorage.getItem("controlPanelTop");
+      const width = localStorage.getItem("controlPanelWidth");
+      const height = localStorage.getItem("controlPanelHeight");
+      
+      if (left && top) {
+        controlPanel.style.right = "auto";
+        controlPanel.style.left = left;
+        controlPanel.style.top = top;
+      }
+      
+      if (width && height) {
+        controlPanel.style.width = width;
+        controlPanel.style.height = height;
+      }
+    }
+    
+    // Save control panel position and size when window unloads
+    window.addEventListener("beforeunload", () => {
+      if (controlPanel.style.left) {
+        localStorage.setItem("controlPanelLeft", controlPanel.style.left);
+        localStorage.setItem("controlPanelTop", controlPanel.style.top);
+        localStorage.setItem("controlPanelWidth", controlPanel.style.width);
+        localStorage.setItem("controlPanelHeight", controlPanel.style.height);
+      }
+    });
     
     // Color presets
     const presetColors = [
@@ -794,6 +926,9 @@
       
       // Load default template
       loadTemplate("default");
+      
+      // Load control panel state
+      loadControlPanelState();
     }
     
     // XML Export/Import functions
@@ -919,31 +1054,6 @@
       return result ? "#" +
         (1 << 24 | result[1] << 16 | result[2] << 8 | result[3] << 0).toString(16).slice(1) : rgb;
     }
-
-    document.addEventListener("mousemove", (e) => {
-      if (isDragging && selectedBox) {
-        selectedBox.style.left = `${e.clientX - offsetX}px`;
-        selectedBox.style.top = `${e.clientY - offsetY}px`;
-        updateControls();
-        saveState();
-      } else if (isResizing && selectedBox) {
-        if (currentResizer.classList.contains("right")) {
-          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
-        } else if (currentResizer.classList.contains("bottom")) {
-          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
-        } else if (currentResizer.classList.contains("corner")) {
-          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
-          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
-        }
-        updateControls();
-        saveState();
-      }
-    });
-
-    document.addEventListener("mouseup", () => {
-      isDragging = false;
-      isResizing = false;
-    });
 
     // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
