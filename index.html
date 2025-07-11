@@ -14,6 +14,16 @@
       position: relative;
       width: 100vw;
       height: 100vh;
+      overflow: hidden;
+      background-color: #f0f0f0;
+    }
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform-origin: 0 0;
     }
     .box {
       position: absolute;
@@ -40,6 +50,9 @@
     .hide-ui-mode .selected {
       border-color: transparent !important;
       box-shadow: none !important;
+    }
+    .hide-ui-mode .resizer {
+      display: none !important;
     }
     .resizer {
       width: 10px;
@@ -100,6 +113,8 @@
       overflow: auto;
     }
     #control-panel-header {
+      position: sticky;
+      top: -10px;
       padding: 5px;
       cursor: move;
       background: #f0f0f0;
@@ -108,6 +123,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      z-index: 1;
     }
     #control-panel.hidden {
       display: none;
@@ -255,6 +271,12 @@
     .template-item:hover {
       background-color: #f0f0f0;
     }
+    .template-item.dragging {
+      opacity: 0.5;
+    }
+    .template-item.over {
+      background-color: #d0e0f0;
+    }
     .template-item-actions {
       display: flex;
     }
@@ -298,10 +320,39 @@
     .notification-visible {
       opacity: 1 !important;
     }
+
+    @media print {
+      body {
+        overflow: visible !important;
+      }
+
+      #control-panel,
+      #control-panel-toggle,
+      #coords,
+      #keyboard-shortcuts,
+      #notificationArea,
+      .resizer {
+        display: none !important;
+      }
+
+      #container {
+        width: auto;
+        height: auto;
+        overflow: visible;
+        background-color: transparent;
+      }
+
+      .box {
+        border-color: transparent !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="container">
+    <div id="canvas"></div>
     <div id="coords">X: 0, Y: 0</div>
     <div id="control-panel-toggle">⚙️</div>
     <div id="control-panel">
@@ -343,7 +394,11 @@
         <button id="addBoxBtn">Add Box</button>
         <button id="duplicateBoxBtn">Duplicate</button>
       </div>
-      <label><input type="checkbox" id="resizerToggle"> Show Resizers</label>
+      <div class="action-buttons">
+        <button id="bringForwardBtn">Bring Forward</button>
+        <button id="sendBackwardBtn">Send Backward</button>
+      </div>
+      <label style="display: none;"><input type="checkbox" id="resizerToggle" checked> Show Resizers</label>
       
       <!-- Template system -->
       <div class="template-section">
@@ -361,10 +416,10 @@
         <div class="export-import-section">
           <h3>Export/Import</h3>
           <div class="export-import-buttons">
-            <button id="exportBtn">Export XML</button>
-            <button id="importBtn">Import XML</button>
+            <button id="exportBtn">Export</button>
+            <button id="importBtn">Import</button>
           </div>
-          <input type="file" id="importFileInput" accept=".xml">
+          <input type="file" id="importFileInput" accept=".txt">
         </div>
       </div>
     </div>
@@ -381,6 +436,7 @@
 
   <script>
     const container = document.getElementById("container");
+    const canvas = document.getElementById("canvas");
     const coords = document.getElementById("coords");
     const controlPanel = document.getElementById("control-panel");
     const controlPanelHeader = document.getElementById("control-panel-header");
@@ -402,6 +458,8 @@
     const increaseFontBtn = document.getElementById("increaseFontBtn");
     const addBoxBtn = document.getElementById("addBoxBtn");
     const duplicateBoxBtn = document.getElementById("duplicateBoxBtn");
+    const bringForwardBtn = document.getElementById("bringForwardBtn");
+    const sendBackwardBtn = document.getElementById("sendBackwardBtn");
     const resizerToggle = document.getElementById("resizerToggle");
     const templateNameInput = document.getElementById("templateNameInput");
     const saveTemplateBtn = document.getElementById("saveTemplateBtn");
@@ -421,7 +479,56 @@
     let currentTemplate = "default";
     let controlPanelDragging = false;
     let controlPanelOffsetX = 0, controlPanelOffsetY = 0;
+    let zIndexCounter = 1;
     
+    // Canvas navigation state
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let panStartX = 0, panStartY = 0;
+
+    function applyTransform() {
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    }
+
+    // Panning and Zooming
+    container.addEventListener("mousedown", (e) => {
+      if (e.target === container || e.target === canvas) {
+        isPanning = true;
+        panStartX = e.clientX - panX;
+        panStartY = e.clientY - panY;
+        container.style.cursor = "grabbing";
+      }
+    });
+
+    container.addEventListener("wheel", (e) => {
+      if (controlPanel.contains(e.target)) {
+        return;
+      }
+      e.preventDefault();
+      const scaleAmount = e.deltaY > 0 ? 0.9 : 1.1;
+      const mouseX = e.clientX - container.getBoundingClientRect().left;
+      const mouseY = e.clientY - container.getBoundingClientRect().top;
+
+      const newPanX = mouseX - (mouseX - panX) * scaleAmount;
+      const newPanY = mouseY - (mouseY - panY) * scaleAmount;
+      
+      panX = newPanX;
+      panY = newPanY;
+      scale *= scaleAmount;
+
+      applyTransform();
+      updateCoords(e);
+    }, { passive: false });
+
+    function updateCoords(e) {
+      const canvasX = (e.clientX - panX) / scale;
+      const canvasY = (e.clientY - panY) / scale;
+      coords.textContent = `X: ${Math.round(canvasX)}, Y: ${Math.round(canvasY)}`;
+    }
+    container.addEventListener("mousemove", updateCoords);
+
     // Control panel dragging and toggling
     controlPanelHeader.addEventListener("mousedown", (e) => {
       if (e.target === controlPanelClose) return;
@@ -431,24 +538,35 @@
     });
     
     document.addEventListener("mousemove", (e) => {
+      if (isPanning) {
+        panX = e.clientX - panStartX;
+        panY = e.clientY - panStartY;
+        applyTransform();
+        return;
+      }
+
       if (controlPanelDragging) {
         controlPanel.style.right = "auto"; // Remove right positioning
         controlPanel.style.left = `${e.clientX - controlPanelOffsetX}px`;
         controlPanel.style.top = `${e.clientY - controlPanelOffsetY}px`;
         e.preventDefault();
       } else if (isDragging && selectedBox) {
-        selectedBox.style.left = `${e.clientX - offsetX}px`;
-        selectedBox.style.top = `${e.clientY - offsetY}px`;
+        const mouseCanvasX = (e.clientX - panX) / scale;
+        const mouseCanvasY = (e.clientY - panY) / scale;
+        selectedBox.style.left = `${mouseCanvasX - offsetX}px`;
+        selectedBox.style.top = `${mouseCanvasY - offsetY}px`;
         updateControls();
         saveState();
       } else if (isResizing && selectedBox) {
+        const dx = (e.clientX - originalX) / scale;
+        const dy = (e.clientY - originalY) / scale;
         if (currentResizer.classList.contains("right")) {
-          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
+          selectedBox.style.width = `${originalWidth + dx}px`;
         } else if (currentResizer.classList.contains("bottom")) {
-          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+          selectedBox.style.height = `${originalHeight + dy}px`;
         } else if (currentResizer.classList.contains("corner")) {
-          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
-          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+          selectedBox.style.width = `${originalWidth + dx}px`;
+          selectedBox.style.height = `${originalHeight + dy}px`;
         }
         updateControls();
         saveState();
@@ -456,6 +574,10 @@
     });
     
     document.addEventListener("mouseup", () => {
+      if (isPanning) {
+        isPanning = false;
+        container.style.cursor = "default";
+      }
       controlPanelDragging = false;
       isDragging = false;
       isResizing = false;
@@ -538,7 +660,7 @@
       colorPresets.appendChild(preset);
     });
 
-    function createBox(x = 100, y = 100, width = 200, height = 200, text = "", color = "rgba(173, 216, 230, 1)", fontSize = 16) {
+    function createBox(x = 100, y = 100, width = 200, height = 200, text = "", color = "rgba(173, 216, 230, 1)", fontSize = 16, zIndex = null) {
       const box = document.createElement("div");
       box.classList.add("box");
       box.style.left = `${x}px`;
@@ -546,9 +668,7 @@
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
       box.style.backgroundColor = color;
-      
-      // Add hide-resizers class by default as the checkbox is unchecked
-      box.classList.add("hide-resizers");
+      box.style.zIndex = zIndex === null ? zIndexCounter++ : zIndex;
       
       // Add white-bg class if the background color is white
       if (color === "#ffffff" || color === "rgb(255, 255, 255)" || color === "rgba(255, 255, 255, 1)" || 
@@ -578,8 +698,10 @@
         if (!e.target.classList.contains("resizer")) {
           selectBox(box);
           isDragging = true;
-          offsetX = e.clientX - box.offsetLeft;
-          offsetY = e.clientY - box.offsetTop;
+          const mouseCanvasX = (e.clientX - panX) / scale;
+          const mouseCanvasY = (e.clientY - panY) / scale;
+          offsetX = mouseCanvasX - box.offsetLeft;
+          offsetY = mouseCanvasY - box.offsetTop;
         }
       });
 
@@ -606,8 +728,8 @@
       resizers.forEach(resizer => {
         resizer.addEventListener("mousedown", (e) => {
           currentResizer = resizer;
-          originalWidth = box.offsetWidth;
-          originalHeight = box.offsetHeight;
+          originalWidth = parseFloat(box.style.width);
+          originalHeight = parseFloat(box.style.height);
           originalX = e.clientX;
           originalY = e.clientY;
           isResizing = true;
@@ -616,9 +738,8 @@
       });
 
       box.addEventListener("click", () => selectBox(box));
-      container.appendChild(box);
+      canvas.appendChild(box);
       selectBox(box);
-      updateResizerVisibility();
       saveState();
       
       return box;
@@ -638,7 +759,8 @@
         selectedBox.offsetHeight,
         textInput.value,
         selectedBox.style.backgroundColor,
-        fontSize
+        fontSize,
+        zIndexCounter++
       );
       
       selectBox(newBox);
@@ -662,19 +784,23 @@
     }
 
     function selectBox(box) {
-      if (selectedBox) selectedBox.classList.remove("selected");
+      if (selectedBox) {
+        selectedBox.classList.remove("selected");
+        selectedBox.classList.add("hide-resizers");
+      }
       selectedBox = box;
       selectedBox.classList.add("selected");
+      updateResizerVisibility();
       updateControls();
     }
 
     function updateControls() {
       if (!selectedBox) return;
       const textInput = selectedBox.querySelector(".textbox");
-      inputX.value = selectedBox.offsetLeft;
-      inputY.value = selectedBox.offsetTop;
-      inputWidth.value = selectedBox.offsetWidth;
-      inputHeight.value = selectedBox.offsetHeight;
+      inputX.value = Math.round(parseFloat(selectedBox.style.left));
+      inputY.value = Math.round(parseFloat(selectedBox.style.top));
+      inputWidth.value = Math.round(parseFloat(selectedBox.style.width));
+      inputHeight.value = Math.round(parseFloat(selectedBox.style.height));
       inputText.value = textInput.value;
       
       // Parse the background color to update color picker and opacity slider
@@ -685,7 +811,7 @@
       const currentFontSize = parseInt(textInput.style.fontSize) || 16;
       inputFontSize.value = currentFontSize;
       
-      coords.textContent = `X: ${selectedBox.offsetLeft}, Y: ${selectedBox.offsetTop}`;
+      coords.textContent = `X: ${Math.round(parseFloat(selectedBox.style.left))}, Y: ${Math.round(parseFloat(selectedBox.style.top))}`;
     }
 
     function updateColorControlsFromBoxColor(bgColor) {
@@ -756,9 +882,9 @@
     }
 
     function updateResizerVisibility() {
-      document.querySelectorAll(".box").forEach(box => {
-        box.classList.toggle("hide-resizers", !resizerToggle.checked);
-      });
+      if (selectedBox) {
+        selectedBox.classList.toggle("hide-resizers", !resizerToggle.checked);
+      }
     }
     
     // Template management functions
@@ -790,7 +916,8 @@
           text: textInput.value,
           color: box.style.backgroundColor,
           fontSize: fontSize,
-          isWhite: box.classList.contains("white-bg")
+          isWhite: box.classList.contains("white-bg"),
+          zIndex: parseInt(box.style.zIndex) || 0
         };
       });
     }
@@ -812,9 +939,13 @@
     }
     
     function loadBoxesFromState(state) {
+      let maxZ = 0;
       // Create boxes from the state
       state.forEach(s => {
-        const box = createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16);
+        const box = createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16, s.zIndex);
+        if (s.zIndex > maxZ) {
+          maxZ = s.zIndex;
+        }
         // Ensure white background boxes are properly marked
         if (s.isWhite || (s.color && 
             (s.color === "#ffffff" || s.color === "rgb(255, 255, 255)" || s.color === "rgba(255, 255, 255, 1)" ||
@@ -822,6 +953,7 @@
           box.classList.add("white-bg");
         }
       });
+      zIndexCounter = maxZ + 1;
     }
     
     function saveTemplate() {
@@ -836,6 +968,13 @@
       currentTemplate = templateName;
       saveState();
       
+      // Add to template order
+      const order = getTemplateOrder();
+      if (!order.includes(templateName)) {
+        order.push(templateName);
+        saveTemplateOrder(order);
+      }
+
       // Update template list in UI
       updateTemplateList();
       
@@ -850,6 +989,14 @@
       if (confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
         localStorage.removeItem(getTemplateKey(templateName));
         
+        // Remove from order
+        const order = getTemplateOrder();
+        const index = order.indexOf(templateName);
+        if (index > -1) {
+          order.splice(index, 1);
+          saveTemplateOrder(order);
+        }
+
         // If we deleted the current template, switch to default
         if (currentTemplate === templateName) {
           currentTemplate = "default";
@@ -886,13 +1033,16 @@
         localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
       }
       
-      // Sort templates alphabetically
-      templates.sort();
+      // Sort templates based on saved order
+      const orderedTemplates = sortTemplates(templates);
       
       // Add each template to the list
-      templates.forEach(template => {
+      orderedTemplates.forEach(template => {
         const item = document.createElement("div");
         item.className = "template-item";
+        item.dataset.templateName = template;
+        item.draggable = true;
+        item.addEventListener("click", () => loadTemplate(template));
         
         // Mark current template
         if (template === currentTemplate) {
@@ -901,7 +1051,6 @@
         
         const templateNameSpan = document.createElement("span");
         templateNameSpan.textContent = template;
-        templateNameSpan.addEventListener("click", () => loadTemplate(template));
         item.appendChild(templateNameSpan);
         
         // Add delete button
@@ -923,6 +1072,105 @@
         
         templateList.appendChild(item);
       });
+    }
+
+    function getTemplateOrder() {
+      return JSON.parse(localStorage.getItem("templateOrder")) || [];
+    }
+
+    function saveTemplateOrder(order) {
+      localStorage.setItem("templateOrder", JSON.stringify(order));
+    }
+
+    function sortTemplates(templates) {
+      const order = getTemplateOrder();
+      const ordered = [];
+      const remaining = [...templates];
+
+      // Add templates in the saved order
+      order.forEach(templateName => {
+        const index = remaining.indexOf(templateName);
+        if (index > -1) {
+          ordered.push(remaining.splice(index, 1)[0]);
+        }
+      });
+
+      // Add any remaining templates (e.g., new ones) and sort them
+      remaining.sort();
+      
+      return ordered.concat(remaining);
+    }
+
+    // Drag and drop for templates
+    let draggedItem = null;
+
+    templateList.addEventListener("dragstart", e => {
+      if (e.target.classList.contains("template-item")) {
+        draggedItem = e.target;
+        setTimeout(() => {
+          e.target.classList.add("dragging");
+        }, 0);
+      }
+    });
+
+    templateList.addEventListener("dragend", e => {
+      if (draggedItem) {
+        draggedItem.classList.remove("dragging");
+        draggedItem = null;
+      }
+    });
+
+    templateList.addEventListener("dragover", e => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(templateList, e.clientY);
+      const currentOver = templateList.querySelector(".over");
+      if (currentOver) {
+        currentOver.classList.remove("over");
+      }
+      if (afterElement == null) {
+        // Don't highlight if dragging over itself
+        if (draggedItem !== templateList.lastChild) {
+          templateList.lastChild.classList.add("over");
+        }
+      } else {
+        if (draggedItem !== afterElement) {
+          afterElement.classList.add("over");
+        }
+      }
+    });
+
+    templateList.addEventListener("drop", e => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(templateList, e.clientY);
+      const currentOver = templateList.querySelector(".over");
+      if (currentOver) {
+        currentOver.classList.remove("over");
+      }
+      if (draggedItem) {
+        if (afterElement == null) {
+          templateList.appendChild(draggedItem);
+        } else {
+          templateList.insertBefore(draggedItem, afterElement);
+        }
+        
+        // Save the new order
+        const newOrder = Array.from(templateList.querySelectorAll(".template-item")).map(item => item.dataset.templateName);
+        saveTemplateOrder(newOrder);
+      }
+    });
+
+    function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll(".template-item:not(.dragging)")];
+
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
     function loadState() {
@@ -962,7 +1210,7 @@
       state.forEach(box => {
         xmlString += `  <box x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" `;
         xmlString += `color="${box.color}" fontSize="${box.fontSize || 16}" `;
-        xmlString += `isWhite="${box.isWhite || false}">\n`;
+        xmlString += `isWhite="${box.isWhite || false}" zIndex="${box.zIndex || 0}">\n`;
         xmlString += `    <text>${escapeXML(box.text)}</text>\n`;
         xmlString += `  </box>\n`;
       });
@@ -975,7 +1223,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${currentTemplate}.xml`;
+      a.download = `${currentTemplate}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1030,6 +1278,7 @@
               color: boxElement.getAttribute("color") || "rgba(173, 216, 230, 1)",
               fontSize: parseInt(boxElement.getAttribute("fontSize")) || 16,
               isWhite: boxElement.getAttribute("isWhite") === "true",
+              zIndex: parseInt(boxElement.getAttribute("zIndex")) || 0,
               text: text
             });
           }
@@ -1094,7 +1343,6 @@
         selectedBox.style.top = `${parseInt(inputY.value)}px`;
         selectedBox.style.width = `${parseInt(inputWidth.value)}px`;
         selectedBox.style.height = `${parseInt(inputHeight.value)}px`;
-        updateControls();
         saveState();
       });
     });
@@ -1161,6 +1409,24 @@
     addBoxBtn.addEventListener("click", () => createBox());
     duplicateBoxBtn.addEventListener("click", duplicateBox);
     resizerToggle.addEventListener("change", updateResizerVisibility);
+
+    bringForwardBtn.addEventListener("click", () => {
+      if (selectedBox) {
+        selectedBox.style.zIndex = zIndexCounter++;
+        saveState();
+      }
+    });
+
+    sendBackwardBtn.addEventListener("click", () => {
+      if (selectedBox) {
+        const boxes = Array.from(document.querySelectorAll(".box"));
+        if (boxes.length < 2) return;
+
+        const minZ = Math.min(...boxes.map(b => parseInt(b.style.zIndex) || 0));
+        selectedBox.style.zIndex = minZ - 1;
+        saveState();
+      }
+    });
     
     // Template management
     saveTemplateBtn.addEventListener("click", saveTemplate);
@@ -1185,6 +1451,54 @@
     
     // Initialize templates and load the state
     loadState();
+    applyTransform(); // Apply initial transform
+
+    let originalPrintState = {};
+
+    window.addEventListener('beforeprint', () => {
+      originalPrintState = { panX, panY, scale };
+
+      const boxes = Array.from(document.querySelectorAll(".box"));
+      if (boxes.length === 0) return;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      boxes.forEach(box => {
+        minX = Math.min(minX, box.offsetLeft);
+        minY = Math.min(minY, box.offsetTop);
+        maxX = Math.max(maxX, box.offsetLeft + box.offsetWidth);
+        maxY = Math.max(maxY, box.offsetTop + box.offsetHeight);
+      });
+
+      const contentWidth = maxX - minX;
+      const contentHeight = maxY - minY;
+
+      if (contentWidth <= 0 || contentHeight <= 0) return;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      const padding = 40; // pixels
+      const effectiveWidth = viewportWidth - padding * 2;
+      const effectiveHeight = viewportHeight - padding * 2;
+
+      const newScale = Math.min(effectiveWidth / contentWidth, effectiveHeight / contentHeight);
+
+      scale = newScale;
+      panX = -minX * scale + (viewportWidth - contentWidth * scale) / 2;
+      panY = -minY * scale + (viewportHeight - contentHeight * scale) / 2;
+
+      applyTransform();
+    });
+
+    window.addEventListener('afterprint', () => {
+      if (originalPrintState) {
+        panX = originalPrintState.panX;
+        panY = originalPrintState.panY;
+        scale = originalPrintState.scale;
+        applyTransform();
+      }
+    });
   </script>
 </body>
 </html>
