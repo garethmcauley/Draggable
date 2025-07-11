@@ -14,6 +14,16 @@
       position: relative;
       width: 100vw;
       height: 100vh;
+      overflow: hidden;
+      background-color: #f0f0f0;
+    }
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform-origin: 0 0;
     }
     .box {
       position: absolute;
@@ -302,6 +312,7 @@
 </head>
 <body>
   <div id="container">
+    <div id="canvas"></div>
     <div id="coords">X: 0, Y: 0</div>
     <div id="control-panel-toggle">⚙️</div>
     <div id="control-panel">
@@ -381,6 +392,7 @@
 
   <script>
     const container = document.getElementById("container");
+    const canvas = document.getElementById("canvas");
     const coords = document.getElementById("coords");
     const controlPanel = document.getElementById("control-panel");
     const controlPanelHeader = document.getElementById("control-panel-header");
@@ -422,6 +434,51 @@
     let controlPanelDragging = false;
     let controlPanelOffsetX = 0, controlPanelOffsetY = 0;
     
+    // Canvas navigation state
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let panStartX = 0, panStartY = 0;
+
+    function applyTransform() {
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    }
+
+    // Panning and Zooming
+    container.addEventListener("mousedown", (e) => {
+      if (e.target === container || e.target === canvas) {
+        isPanning = true;
+        panStartX = e.clientX - panX;
+        panStartY = e.clientY - panY;
+        container.style.cursor = "grabbing";
+      }
+    });
+
+    container.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const scaleAmount = e.deltaY > 0 ? 0.9 : 1.1;
+      const mouseX = e.clientX - container.getBoundingClientRect().left;
+      const mouseY = e.clientY - container.getBoundingClientRect().top;
+
+      const newPanX = mouseX - (mouseX - panX) * scaleAmount;
+      const newPanY = mouseY - (mouseY - panY) * scaleAmount;
+      
+      panX = newPanX;
+      panY = newPanY;
+      scale *= scaleAmount;
+
+      applyTransform();
+      updateCoords(e);
+    });
+
+    function updateCoords(e) {
+      const canvasX = (e.clientX - panX) / scale;
+      const canvasY = (e.clientY - panY) / scale;
+      coords.textContent = `X: ${Math.round(canvasX)}, Y: ${Math.round(canvasY)}`;
+    }
+    container.addEventListener("mousemove", updateCoords);
+
     // Control panel dragging and toggling
     controlPanelHeader.addEventListener("mousedown", (e) => {
       if (e.target === controlPanelClose) return;
@@ -431,24 +488,35 @@
     });
     
     document.addEventListener("mousemove", (e) => {
+      if (isPanning) {
+        panX = e.clientX - panStartX;
+        panY = e.clientY - panStartY;
+        applyTransform();
+        return;
+      }
+
       if (controlPanelDragging) {
         controlPanel.style.right = "auto"; // Remove right positioning
         controlPanel.style.left = `${e.clientX - controlPanelOffsetX}px`;
         controlPanel.style.top = `${e.clientY - controlPanelOffsetY}px`;
         e.preventDefault();
       } else if (isDragging && selectedBox) {
-        selectedBox.style.left = `${e.clientX - offsetX}px`;
-        selectedBox.style.top = `${e.clientY - offsetY}px`;
+        const mouseCanvasX = (e.clientX - panX) / scale;
+        const mouseCanvasY = (e.clientY - panY) / scale;
+        selectedBox.style.left = `${mouseCanvasX - offsetX}px`;
+        selectedBox.style.top = `${mouseCanvasY - offsetY}px`;
         updateControls();
         saveState();
       } else if (isResizing && selectedBox) {
+        const dx = (e.clientX - originalX) / scale;
+        const dy = (e.clientY - originalY) / scale;
         if (currentResizer.classList.contains("right")) {
-          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
+          selectedBox.style.width = `${originalWidth + dx}px`;
         } else if (currentResizer.classList.contains("bottom")) {
-          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+          selectedBox.style.height = `${originalHeight + dy}px`;
         } else if (currentResizer.classList.contains("corner")) {
-          selectedBox.style.width = `${originalWidth + (e.clientX - originalX)}px`;
-          selectedBox.style.height = `${originalHeight + (e.clientY - originalY)}px`;
+          selectedBox.style.width = `${originalWidth + dx}px`;
+          selectedBox.style.height = `${originalHeight + dy}px`;
         }
         updateControls();
         saveState();
@@ -456,6 +524,10 @@
     });
     
     document.addEventListener("mouseup", () => {
+      if (isPanning) {
+        isPanning = false;
+        container.style.cursor = "default";
+      }
       controlPanelDragging = false;
       isDragging = false;
       isResizing = false;
@@ -578,8 +650,10 @@
         if (!e.target.classList.contains("resizer")) {
           selectBox(box);
           isDragging = true;
-          offsetX = e.clientX - box.offsetLeft;
-          offsetY = e.clientY - box.offsetTop;
+          const mouseCanvasX = (e.clientX - panX) / scale;
+          const mouseCanvasY = (e.clientY - panY) / scale;
+          offsetX = mouseCanvasX - box.offsetLeft;
+          offsetY = mouseCanvasY - box.offsetTop;
         }
       });
 
@@ -606,8 +680,8 @@
       resizers.forEach(resizer => {
         resizer.addEventListener("mousedown", (e) => {
           currentResizer = resizer;
-          originalWidth = box.offsetWidth;
-          originalHeight = box.offsetHeight;
+          originalWidth = parseFloat(box.style.width);
+          originalHeight = parseFloat(box.style.height);
           originalX = e.clientX;
           originalY = e.clientY;
           isResizing = true;
@@ -616,7 +690,7 @@
       });
 
       box.addEventListener("click", () => selectBox(box));
-      container.appendChild(box);
+      canvas.appendChild(box);
       selectBox(box);
       updateResizerVisibility();
       saveState();
@@ -671,10 +745,10 @@
     function updateControls() {
       if (!selectedBox) return;
       const textInput = selectedBox.querySelector(".textbox");
-      inputX.value = selectedBox.offsetLeft;
-      inputY.value = selectedBox.offsetTop;
-      inputWidth.value = selectedBox.offsetWidth;
-      inputHeight.value = selectedBox.offsetHeight;
+      inputX.value = Math.round(parseFloat(selectedBox.style.left));
+      inputY.value = Math.round(parseFloat(selectedBox.style.top));
+      inputWidth.value = Math.round(parseFloat(selectedBox.style.width));
+      inputHeight.value = Math.round(parseFloat(selectedBox.style.height));
       inputText.value = textInput.value;
       
       // Parse the background color to update color picker and opacity slider
@@ -685,7 +759,7 @@
       const currentFontSize = parseInt(textInput.style.fontSize) || 16;
       inputFontSize.value = currentFontSize;
       
-      coords.textContent = `X: ${selectedBox.offsetLeft}, Y: ${selectedBox.offsetTop}`;
+      coords.textContent = `X: ${Math.round(parseFloat(selectedBox.style.left))}, Y: ${Math.round(parseFloat(selectedBox.style.top))}`;
     }
 
     function updateColorControlsFromBoxColor(bgColor) {
@@ -1094,7 +1168,6 @@
         selectedBox.style.top = `${parseInt(inputY.value)}px`;
         selectedBox.style.width = `${parseInt(inputWidth.value)}px`;
         selectedBox.style.height = `${parseInt(inputHeight.value)}px`;
-        updateControls();
         saveState();
       });
     });
@@ -1185,6 +1258,7 @@
     
     // Initialize templates and load the state
     loadState();
+    applyTransform(); // Apply initial transform
   </script>
 </body>
 </html>
