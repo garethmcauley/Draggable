@@ -113,6 +113,8 @@
       overflow: auto;
     }
     #control-panel-header {
+      position: sticky;
+      top: -10px;
       padding: 5px;
       cursor: move;
       background: #f0f0f0;
@@ -121,6 +123,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      z-index: 1;
     }
     #control-panel.hidden {
       display: none;
@@ -268,6 +271,12 @@
     .template-item:hover {
       background-color: #f0f0f0;
     }
+    .template-item.dragging {
+      opacity: 0.5;
+    }
+    .template-item.over {
+      background-color: #d0e0f0;
+    }
     .template-item-actions {
       display: flex;
     }
@@ -385,6 +394,10 @@
         <button id="addBoxBtn">Add Box</button>
         <button id="duplicateBoxBtn">Duplicate</button>
       </div>
+      <div class="action-buttons">
+        <button id="bringForwardBtn">Bring Forward</button>
+        <button id="sendBackwardBtn">Send Backward</button>
+      </div>
       <label style="display: none;"><input type="checkbox" id="resizerToggle" checked> Show Resizers</label>
       
       <!-- Template system -->
@@ -403,10 +416,10 @@
         <div class="export-import-section">
           <h3>Export/Import</h3>
           <div class="export-import-buttons">
-            <button id="exportBtn">Export XML</button>
-            <button id="importBtn">Import XML</button>
+            <button id="exportBtn">Export</button>
+            <button id="importBtn">Import</button>
           </div>
-          <input type="file" id="importFileInput" accept=".xml">
+          <input type="file" id="importFileInput" accept=".txt">
         </div>
       </div>
     </div>
@@ -445,6 +458,8 @@
     const increaseFontBtn = document.getElementById("increaseFontBtn");
     const addBoxBtn = document.getElementById("addBoxBtn");
     const duplicateBoxBtn = document.getElementById("duplicateBoxBtn");
+    const bringForwardBtn = document.getElementById("bringForwardBtn");
+    const sendBackwardBtn = document.getElementById("sendBackwardBtn");
     const resizerToggle = document.getElementById("resizerToggle");
     const templateNameInput = document.getElementById("templateNameInput");
     const saveTemplateBtn = document.getElementById("saveTemplateBtn");
@@ -464,6 +479,7 @@
     let currentTemplate = "default";
     let controlPanelDragging = false;
     let controlPanelOffsetX = 0, controlPanelOffsetY = 0;
+    let zIndexCounter = 1;
     
     // Canvas navigation state
     let scale = 1;
@@ -644,7 +660,7 @@
       colorPresets.appendChild(preset);
     });
 
-    function createBox(x = 100, y = 100, width = 200, height = 200, text = "", color = "rgba(173, 216, 230, 1)", fontSize = 16) {
+    function createBox(x = 100, y = 100, width = 200, height = 200, text = "", color = "rgba(173, 216, 230, 1)", fontSize = 16, zIndex = null) {
       const box = document.createElement("div");
       box.classList.add("box");
       box.style.left = `${x}px`;
@@ -652,6 +668,7 @@
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
       box.style.backgroundColor = color;
+      box.style.zIndex = zIndex === null ? zIndexCounter++ : zIndex;
       
       // Add white-bg class if the background color is white
       if (color === "#ffffff" || color === "rgb(255, 255, 255)" || color === "rgba(255, 255, 255, 1)" || 
@@ -742,7 +759,8 @@
         selectedBox.offsetHeight,
         textInput.value,
         selectedBox.style.backgroundColor,
-        fontSize
+        fontSize,
+        zIndexCounter++
       );
       
       selectBox(newBox);
@@ -898,7 +916,8 @@
           text: textInput.value,
           color: box.style.backgroundColor,
           fontSize: fontSize,
-          isWhite: box.classList.contains("white-bg")
+          isWhite: box.classList.contains("white-bg"),
+          zIndex: parseInt(box.style.zIndex) || 0
         };
       });
     }
@@ -920,9 +939,13 @@
     }
     
     function loadBoxesFromState(state) {
+      let maxZ = 0;
       // Create boxes from the state
       state.forEach(s => {
-        const box = createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16);
+        const box = createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16, s.zIndex);
+        if (s.zIndex > maxZ) {
+          maxZ = s.zIndex;
+        }
         // Ensure white background boxes are properly marked
         if (s.isWhite || (s.color && 
             (s.color === "#ffffff" || s.color === "rgb(255, 255, 255)" || s.color === "rgba(255, 255, 255, 1)" ||
@@ -930,6 +953,7 @@
           box.classList.add("white-bg");
         }
       });
+      zIndexCounter = maxZ + 1;
     }
     
     function saveTemplate() {
@@ -944,6 +968,13 @@
       currentTemplate = templateName;
       saveState();
       
+      // Add to template order
+      const order = getTemplateOrder();
+      if (!order.includes(templateName)) {
+        order.push(templateName);
+        saveTemplateOrder(order);
+      }
+
       // Update template list in UI
       updateTemplateList();
       
@@ -958,6 +989,14 @@
       if (confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
         localStorage.removeItem(getTemplateKey(templateName));
         
+        // Remove from order
+        const order = getTemplateOrder();
+        const index = order.indexOf(templateName);
+        if (index > -1) {
+          order.splice(index, 1);
+          saveTemplateOrder(order);
+        }
+
         // If we deleted the current template, switch to default
         if (currentTemplate === templateName) {
           currentTemplate = "default";
@@ -994,13 +1033,16 @@
         localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
       }
       
-      // Sort templates alphabetically
-      templates.sort();
+      // Sort templates based on saved order
+      const orderedTemplates = sortTemplates(templates);
       
       // Add each template to the list
-      templates.forEach(template => {
+      orderedTemplates.forEach(template => {
         const item = document.createElement("div");
         item.className = "template-item";
+        item.dataset.templateName = template;
+        item.draggable = true;
+        item.addEventListener("click", () => loadTemplate(template));
         
         // Mark current template
         if (template === currentTemplate) {
@@ -1009,7 +1051,6 @@
         
         const templateNameSpan = document.createElement("span");
         templateNameSpan.textContent = template;
-        templateNameSpan.addEventListener("click", () => loadTemplate(template));
         item.appendChild(templateNameSpan);
         
         // Add delete button
@@ -1031,6 +1072,105 @@
         
         templateList.appendChild(item);
       });
+    }
+
+    function getTemplateOrder() {
+      return JSON.parse(localStorage.getItem("templateOrder")) || [];
+    }
+
+    function saveTemplateOrder(order) {
+      localStorage.setItem("templateOrder", JSON.stringify(order));
+    }
+
+    function sortTemplates(templates) {
+      const order = getTemplateOrder();
+      const ordered = [];
+      const remaining = [...templates];
+
+      // Add templates in the saved order
+      order.forEach(templateName => {
+        const index = remaining.indexOf(templateName);
+        if (index > -1) {
+          ordered.push(remaining.splice(index, 1)[0]);
+        }
+      });
+
+      // Add any remaining templates (e.g., new ones) and sort them
+      remaining.sort();
+      
+      return ordered.concat(remaining);
+    }
+
+    // Drag and drop for templates
+    let draggedItem = null;
+
+    templateList.addEventListener("dragstart", e => {
+      if (e.target.classList.contains("template-item")) {
+        draggedItem = e.target;
+        setTimeout(() => {
+          e.target.classList.add("dragging");
+        }, 0);
+      }
+    });
+
+    templateList.addEventListener("dragend", e => {
+      if (draggedItem) {
+        draggedItem.classList.remove("dragging");
+        draggedItem = null;
+      }
+    });
+
+    templateList.addEventListener("dragover", e => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(templateList, e.clientY);
+      const currentOver = templateList.querySelector(".over");
+      if (currentOver) {
+        currentOver.classList.remove("over");
+      }
+      if (afterElement == null) {
+        // Don't highlight if dragging over itself
+        if (draggedItem !== templateList.lastChild) {
+          templateList.lastChild.classList.add("over");
+        }
+      } else {
+        if (draggedItem !== afterElement) {
+          afterElement.classList.add("over");
+        }
+      }
+    });
+
+    templateList.addEventListener("drop", e => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(templateList, e.clientY);
+      const currentOver = templateList.querySelector(".over");
+      if (currentOver) {
+        currentOver.classList.remove("over");
+      }
+      if (draggedItem) {
+        if (afterElement == null) {
+          templateList.appendChild(draggedItem);
+        } else {
+          templateList.insertBefore(draggedItem, afterElement);
+        }
+        
+        // Save the new order
+        const newOrder = Array.from(templateList.querySelectorAll(".template-item")).map(item => item.dataset.templateName);
+        saveTemplateOrder(newOrder);
+      }
+    });
+
+    function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll(".template-item:not(.dragging)")];
+
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
     function loadState() {
@@ -1070,7 +1210,7 @@
       state.forEach(box => {
         xmlString += `  <box x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" `;
         xmlString += `color="${box.color}" fontSize="${box.fontSize || 16}" `;
-        xmlString += `isWhite="${box.isWhite || false}">\n`;
+        xmlString += `isWhite="${box.isWhite || false}" zIndex="${box.zIndex || 0}">\n`;
         xmlString += `    <text>${escapeXML(box.text)}</text>\n`;
         xmlString += `  </box>\n`;
       });
@@ -1083,7 +1223,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${currentTemplate}.xml`;
+      a.download = `${currentTemplate}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1138,6 +1278,7 @@
               color: boxElement.getAttribute("color") || "rgba(173, 216, 230, 1)",
               fontSize: parseInt(boxElement.getAttribute("fontSize")) || 16,
               isWhite: boxElement.getAttribute("isWhite") === "true",
+              zIndex: parseInt(boxElement.getAttribute("zIndex")) || 0,
               text: text
             });
           }
@@ -1268,6 +1409,24 @@
     addBoxBtn.addEventListener("click", () => createBox());
     duplicateBoxBtn.addEventListener("click", duplicateBox);
     resizerToggle.addEventListener("change", updateResizerVisibility);
+
+    bringForwardBtn.addEventListener("click", () => {
+      if (selectedBox) {
+        selectedBox.style.zIndex = zIndexCounter++;
+        saveState();
+      }
+    });
+
+    sendBackwardBtn.addEventListener("click", () => {
+      if (selectedBox) {
+        const boxes = Array.from(document.querySelectorAll(".box"));
+        if (boxes.length < 2) return;
+
+        const minZ = Math.min(...boxes.map(b => parseInt(b.style.zIndex) || 0));
+        selectedBox.style.zIndex = minZ - 1;
+        saveState();
+      }
+    });
     
     // Template management
     saveTemplateBtn.addEventListener("click", saveTemplate);
