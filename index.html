@@ -308,6 +308,34 @@
     .notification-visible {
       opacity: 1 !important;
     }
+
+    @media print {
+      body {
+        overflow: visible !important;
+      }
+
+      #control-panel,
+      #control-panel-toggle,
+      #coords,
+      #keyboard-shortcuts,
+      #notificationArea,
+      .resizer {
+        display: none !important;
+      }
+
+      #container {
+        width: auto;
+        height: auto;
+        overflow: visible;
+        background-color: transparent;
+      }
+
+      .box {
+        border-color: transparent !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1259,6 +1287,53 @@
     // Initialize templates and load the state
     loadState();
     applyTransform(); // Apply initial transform
+
+    let originalPrintState = {};
+
+    window.addEventListener('beforeprint', () => {
+      originalPrintState = { panX, panY, scale };
+
+      const boxes = Array.from(document.querySelectorAll(".box"));
+      if (boxes.length === 0) return;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      boxes.forEach(box => {
+        minX = Math.min(minX, box.offsetLeft);
+        minY = Math.min(minY, box.offsetTop);
+        maxX = Math.max(maxX, box.offsetLeft + box.offsetWidth);
+        maxY = Math.max(maxY, box.offsetTop + box.offsetHeight);
+      });
+
+      const contentWidth = maxX - minX;
+      const contentHeight = maxY - minY;
+
+      if (contentWidth <= 0 || contentHeight <= 0) return;
+
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      const padding = 40; // pixels
+      const effectiveWidth = viewportWidth - padding * 2;
+      const effectiveHeight = viewportHeight - padding * 2;
+
+      const newScale = Math.min(effectiveWidth / contentWidth, effectiveHeight / contentHeight);
+
+      scale = newScale;
+      panX = -minX * scale + (viewportWidth - contentWidth * scale) / 2;
+      panY = -minY * scale + (viewportHeight - contentHeight * scale) / 2;
+
+      applyTransform();
+    });
+
+    window.addEventListener('afterprint', () => {
+      if (originalPrintState) {
+        panX = originalPrintState.panX;
+        panY = originalPrintState.panY;
+        scale = originalPrintState.scale;
+        applyTransform();
+      }
+    });
   </script>
 </body>
 </html>
