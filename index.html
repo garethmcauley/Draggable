@@ -434,6 +434,7 @@
   </div>
 
   <script>
+    // DOM element references
     const container = document.getElementById("container");
     const canvas = document.getElementById("canvas");
     const coords = document.getElementById("coords");
@@ -469,6 +470,7 @@
     const importFileInput = document.getElementById("importFileInput");
     const notificationArea = document.getElementById("notificationArea");
 
+    // Global state variables
     let selectedBox = null;
     let isDragging = false;
     let offsetX = 0, offsetY = 0;
@@ -489,15 +491,17 @@
     let panStartX = 0, panStartY = 0;
     let hasPanned = false;
 
+    // Apply CSS transform for panning and zooming
     function applyTransform() {
       canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
     }
 
-    // Panning and Zooming
+    // Panning and Zooming event listeners
     container.addEventListener("mousedown", (e) => {
+      // Start panning if the mousedown is on the container or canvas
       if (e.target === container || e.target === canvas) {
         isPanning = true;
-        hasPanned = false;
+        hasPanned = false; // Reset pan state on new mousedown
         panStartX = e.clientX - panX;
         panStartY = e.clientY - panY;
         container.style.cursor = "grabbing";
@@ -505,10 +509,13 @@
     });
 
     container.addEventListener("wheel", (e) => {
+      // Prevent zooming while scrolling inside the control panel
       if (controlPanel.contains(e.target)) {
         return;
       }
       e.preventDefault();
+      
+      // Calculate scale and pan values for zooming
       const scaleAmount = e.deltaY > 0 ? 0.9 : 1.1;
       const mouseX = e.clientX - container.getBoundingClientRect().left;
       const mouseY = e.clientY - container.getBoundingClientRect().top;
@@ -524,6 +531,7 @@
       updateCoords(e);
     }, { passive: false });
 
+    // Update the coordinate display
     function updateCoords(e) {
       const canvasX = (e.clientX - panX) / scale;
       const canvasY = (e.clientY - panY) / scale;
@@ -531,7 +539,7 @@
     }
     container.addEventListener("mousemove", updateCoords);
 
-    // Control panel dragging and toggling
+    // Control panel dragging logic
     controlPanelHeader.addEventListener("mousedown", (e) => {
       if (e.target === controlPanelClose) return;
       controlPanelDragging = true;
@@ -539,7 +547,9 @@
       controlPanelOffsetY = e.clientY - controlPanel.getBoundingClientRect().top;
     });
     
+    // Global mousemove handler for all dragging/resizing/panning
     document.addEventListener("mousemove", (e) => {
+      // Handle canvas panning
       if (isPanning) {
         hasPanned = true;
         panX = e.clientX - panStartX;
@@ -548,12 +558,14 @@
         return;
       }
 
+      // Handle control panel dragging
       if (controlPanelDragging) {
         controlPanel.style.right = "auto"; // Remove right positioning
         controlPanel.style.left = `${e.clientX - controlPanelOffsetX}px`;
         controlPanel.style.top = `${e.clientY - controlPanelOffsetY}px`;
         e.preventDefault();
       } else if (isDragging && selectedBox) {
+        // Handle box dragging
         const mouseCanvasX = (e.clientX - panX) / scale;
         const mouseCanvasY = (e.clientY - panY) / scale;
         selectedBox.style.left = `${mouseCanvasX - offsetX}px`;
@@ -561,6 +573,7 @@
         updateControls();
         saveState();
       } else if (isResizing && selectedBox) {
+        // Handle box resizing
         const dx = (e.clientX - originalX) / scale;
         const dy = (e.clientY - originalY) / scale;
         if (currentResizer.classList.contains("right")) {
@@ -576,8 +589,10 @@
       }
     });
     
+    // Global mouseup handler to end all dragging/resizing/panning
     document.addEventListener("mouseup", (e) => {
       if (isPanning) {
+        // If it was a click (not a pan), deselect the box
         if (!hasPanned && (e.target === container || e.target === canvas)) {
           selectBox(null);
           if (!controlPanel.classList.contains("hidden")) {
@@ -593,62 +608,36 @@
       isResizing = false;
     });
     
-    // Control panel toggle
+    // Toggle visibility of UI elements
     function toggleUIElements(isHidden) {
       controlPanel.classList.toggle("hidden", isHidden);
       keyboardShortcuts.classList.toggle("hidden", isHidden);
       coords.classList.toggle("hidden", isHidden);
       container.classList.toggle("hide-ui-mode", isHidden);
       
-      // Save the state
+      // Save the visibility state
       localStorage.setItem("controlPanelHidden", isHidden);
     }
     
+    // Event listeners for control panel toggle and close buttons
     controlPanelToggle.addEventListener("click", () => {
       const willBeHidden = !controlPanel.classList.contains("hidden");
-      autoHidden = false;
+      autoHidden = false; // Manual toggle
       toggleUIElements(willBeHidden);
     });
     
     controlPanelClose.addEventListener("click", () => {
-      autoHidden = false;
+      autoHidden = false; // Manual close
       toggleUIElements(true);
     });
     
-    // Load control panel visibility state
+    // Load control panel visibility state on page load
     function loadControlPanelState() {
       const isHidden = localStorage.getItem("controlPanelHidden") === "true";
       toggleUIElements(isHidden);
-      
-      // Load position if saved
-      const left = localStorage.getItem("controlPanelLeft");
-      const top = localStorage.getItem("controlPanelTop");
-      const width = localStorage.getItem("controlPanelWidth");
-      const height = localStorage.getItem("controlPanelHeight");
-      
-      if (left && top) {
-        controlPanel.style.right = "auto";
-        controlPanel.style.left = left;
-        controlPanel.style.top = top;
-      }
-      
-      if (width && height) {
-        controlPanel.style.width = width;
-        controlPanel.style.height = height;
-      }
     }
     
-    // Save control panel position and size when window unloads
-    window.addEventListener("beforeunload", () => {
-      if (controlPanel.style.left) {
-        localStorage.setItem("controlPanelLeft", controlPanel.style.left);
-        localStorage.setItem("controlPanelTop", controlPanel.style.top);
-        localStorage.setItem("controlPanelWidth", controlPanel.style.width);
-        localStorage.setItem("controlPanelHeight", controlPanel.style.height);
-      }
-    });
-    
-    // Color presets
+    // Color presets for the color picker
     const presetColors = [
       "#ff0000", "#ff9900", "#ffff00", "#00ff00", 
       "#00ffff", "#0000ff", "#9900ff", "#ff00ff", 
@@ -656,7 +645,7 @@
       "#ffb6c1", "#ffa07a", "#dda0dd", "#f0e68c"
     ];
     
-    // Initialize color presets
+    // Initialize color presets in the UI
     presetColors.forEach(color => {
       const preset = document.createElement("div");
       preset.className = "color-preset";
@@ -672,6 +661,7 @@
       colorPresets.appendChild(preset);
     });
 
+    // Create a new box element
     function createBox(x = 100, y = 100, width = 200, height = 200, text = "", color = "rgba(173, 216, 230, 1)", fontSize = 16, zIndex = null) {
       const box = document.createElement("div");
       box.classList.add("box");
@@ -682,7 +672,7 @@
       box.style.backgroundColor = color;
       box.style.zIndex = zIndex === null ? zIndexCounter++ : zIndex;
       
-      // Add white-bg class if the background color is white
+      // Add white-bg class for better visibility on white backgrounds
       if (color === "#ffffff" || color === "rgb(255, 255, 255)" || color === "rgba(255, 255, 255, 1)" || 
           (color.startsWith("rgba(") && color.includes("255, 255, 255"))) {
         box.classList.add("white-bg");
@@ -698,6 +688,7 @@
         saveState();
       });
 
+      // Create resizers
       ["right", "bottom", "corner"].forEach(pos => {
         const resizer = document.createElement("div");
         resizer.classList.add("resizer", pos);
@@ -706,6 +697,7 @@
 
       box.appendChild(textInput);
 
+      // Event listener for starting to drag a box
       box.addEventListener("mousedown", (e) => {
         if (!e.target.classList.contains("resizer")) {
           selectBox(box);
@@ -717,7 +709,7 @@
         }
       });
 
-      // Add right-click to delete box
+      // Right-click context menu to delete a box
       box.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         if (confirm("Delete this box?")) {
@@ -729,7 +721,7 @@
         }
       });
 
-      // Add double-click to toggle UI visibility
+      // Double-click to toggle UI visibility
       box.addEventListener("dblclick", (e) => {
         if (container.classList.contains("hide-ui-mode")) {
           toggleUIElements(false);
@@ -737,6 +729,7 @@
         e.stopPropagation();
       });
 
+      // Event listeners for resizers
       const resizers = box.querySelectorAll(".resizer");
       resizers.forEach(resizer => {
         resizer.addEventListener("mousedown", (e) => {
@@ -758,13 +751,14 @@
       return box;
     }
 
+    // Duplicate the currently selected box
     function duplicateBox() {
       if (!selectedBox) return;
       
       const textInput = selectedBox.querySelector(".textbox");
       const fontSize = parseInt(textInput.style.fontSize) || 16;
       
-      // Create a new box with a slight offset from the original
+      // Create a new box with a slight offset
       const newBox = createBox(
         selectedBox.offsetLeft + 20,
         selectedBox.offsetTop + 20,
@@ -779,6 +773,7 @@
       selectBox(newBox);
     }
 
+    // Delete the currently selected box
     function deleteSelectedBox() {
       if (!selectedBox) return;
       
@@ -788,6 +783,7 @@
       saveState();
     }
 
+    // Select a box and update its state
     function selectBox(box) {
       // Deselect old box if it exists
       if (selectedBox) {
@@ -803,6 +799,7 @@
         updateResizerVisibility(); // This will remove hide-resizers if checkbox is checked
         updateControls();
         
+        // Show control panel if it was auto-hidden
         if (controlPanel.classList.contains("hidden") && autoHidden) {
             toggleUIElements(false);
         }
@@ -813,6 +810,7 @@
       }
     }
 
+    // Update the control panel with the selected box's properties
     function updateControls() {
       if (!selectedBox) {
         inputX.value = "";
@@ -829,42 +827,39 @@
       inputHeight.value = Math.round(parseFloat(selectedBox.style.height));
       inputText.value = textInput.value;
       
-      // Parse the background color to update color picker and opacity slider
+      // Update color controls
       const bgColor = selectedBox.style.backgroundColor;
       updateColorControlsFromBoxColor(bgColor);
       
-      // Get font size (remove 'px' and convert to number)
+      // Update font size control
       const currentFontSize = parseInt(textInput.style.fontSize) || 16;
       inputFontSize.value = currentFontSize;
       
+      // Update coordinate display
       coords.textContent = `X: ${Math.round(parseFloat(selectedBox.style.left))}, Y: ${Math.round(parseFloat(selectedBox.style.top))}`;
     }
 
+    // Update color picker and opacity slider from a box's color
     function updateColorControlsFromBoxColor(bgColor) {
-      // Parse RGBA value
       const rgba = parseRGBA(bgColor);
       if (rgba) {
-        // Convert RGB to HEX for the color input
         const hexColor = rgbToHex(`rgb(${rgba.r},${rgba.g},${rgba.b})`);
         inputColor.value = hexColor;
         
-        // Update opacity
         currentOpacity = Math.round(rgba.a * 100);
         opacityControl.value = currentOpacity;
         opacityValue.textContent = `${currentOpacity}%`;
         
-        // Update preview
         updateColorPreview();
       }
     }
 
+    // Parse an RGBA color string into an object
     function parseRGBA(rgba) {
-      // Check if it's already in hex
       if (rgba.startsWith('#')) {
-        return { r: 0, g: 0, b: 0, a: 1 }; // Default to full opacity
+        return { r: 0, g: 0, b: 0, a: 1 }; // Should not happen with current logic, but good fallback
       }
       
-      // Parse rgba() format
       const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/);
       if (match) {
         return {
@@ -878,6 +873,7 @@
       return null;
     }
 
+    // Update the color preview swatch
     function updateColorPreview() {
       const hexColor = inputColor.value;
       const opacity = opacityControl.value / 100;
@@ -885,6 +881,7 @@
       colorPreview.style.backgroundColor = rgba;
     }
 
+    // Convert a HEX color and alpha value to an RGBA string
     function hexToRGBA(hex, alpha = 1) {
       const r = parseInt(hex.slice(1, 3), 16);
       const g = parseInt(hex.slice(3, 5), 16);
@@ -892,6 +889,7 @@
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
 
+    // Apply the current color and opacity to a box
     function applyColorToBox(box) {
       if (!box) return;
       const hexColor = inputColor.value;
@@ -899,7 +897,7 @@
       const rgba = hexToRGBA(hexColor, opacity);
       box.style.backgroundColor = rgba;
       
-      // Update white-bg class based on the new color
+      // Toggle white-bg class for better border visibility
       if (hexColor === "#ffffff" && opacity >= 0.9) {
         box.classList.add("white-bg");
       } else {
@@ -907,29 +905,32 @@
       }
     }
 
+    // Toggle visibility of resizers based on the checkbox
     function updateResizerVisibility() {
       if (selectedBox) {
         selectedBox.classList.toggle("hide-resizers", !resizerToggle.checked);
       }
     }
     
-    // Template management functions
+    // --- Template Management ---
+
+    // Get the local storage key for a template
     function getTemplateKey(templateName) {
       return `shapeTemplate_${templateName}`;
     }
     
+    // Save the current state of all boxes to local storage
     function saveState() {
       const state = getStateObject();
-      
-      // Save to current template
       localStorage.setItem(getTemplateKey(currentTemplate), JSON.stringify(state));
       
-      // For backward compatibility
+      // For backward compatibility with older versions
       if (currentTemplate === "default") {
         localStorage.setItem("shapeState", JSON.stringify(state));
       }
     }
     
+    // Get an object representing the state of all boxes
     function getStateObject() {
       return Array.from(document.querySelectorAll(".box")).map(box => {
         const textInput = box.querySelector(".textbox");
@@ -948,34 +949,31 @@
       });
     }
 
+    // Load a template from local storage
     function loadTemplate(templateName) {
-      // Clear existing boxes
       clearAllBoxes();
       
       currentTemplate = templateName;
       
-      // Load the state for the selected template
       const key = getTemplateKey(templateName);
       const state = JSON.parse(localStorage.getItem(key)) || [];
       
       loadBoxesFromState(state);
       
-      // Update UI
       updateTemplateList();
       
-      // Set as last viewed
+      // Remember the last viewed template
       localStorage.setItem("lastViewedTemplate", templateName);
     }
     
+    // Create boxes from a state object
     function loadBoxesFromState(state) {
       let maxZ = 0;
-      // Create boxes from the state
       state.forEach(s => {
         const box = createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16, s.zIndex);
         if (s.zIndex > maxZ) {
           maxZ = s.zIndex;
         }
-        // Ensure white background boxes are properly marked
         if (s.isWhite || (s.color && 
             (s.color === "#ffffff" || s.color === "rgb(255, 255, 255)" || s.color === "rgba(255, 255, 255, 1)" ||
             (s.color.startsWith("rgba(") && s.color.includes("255, 255, 255"))))) {
@@ -985,6 +983,7 @@
       zIndexCounter = maxZ + 1;
     }
     
+    // Save the current canvas as a new template
     function saveTemplate() {
       let templateName = templateNameInput.value.trim();
       
@@ -993,35 +992,31 @@
         return;
       }
       
-      // Update current template name and save state
       currentTemplate = templateName;
       saveState();
       
-      // Add to template order
+      // Add to template order for drag-and-drop
       const order = getTemplateOrder();
       if (!order.includes(templateName)) {
         order.push(templateName);
         saveTemplateOrder(order);
       }
 
-      // Update template list in UI
       updateTemplateList();
       
       // Set as last viewed
       localStorage.setItem("lastViewedTemplate", templateName);
 
-      // Clear the input
       templateNameInput.value = "";
-      
-      // Show notification
       showNotification(`Template "${templateName}" saved`);
     }
     
+    // Delete a template from local storage
     function deleteTemplate(templateName) {
       if (confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
         localStorage.removeItem(getTemplateKey(templateName));
         
-        // Remove from order
+        // Remove from template order
         const order = getTemplateOrder();
         const index = order.indexOf(templateName);
         if (index > -1) {
@@ -1031,7 +1026,6 @@
 
         // If we deleted the current template, switch to default
         if (currentTemplate === templateName) {
-          currentTemplate = "default";
           loadTemplate("default");
         } else {
           updateTemplateList();
@@ -1039,18 +1033,18 @@
       }
     }
     
+    // Clear all boxes from the canvas
     function clearAllBoxes() {
-      // Remove all boxes from the container
       const boxes = document.querySelectorAll(".box");
       boxes.forEach(box => box.remove());
       selectedBox = null;
     }
     
+    // Update the template list in the control panel
     function updateTemplateList() {
-      // Clear existing list
       templateList.innerHTML = "";
       
-      // Get all template keys
+      // Get all template keys from local storage
       const templates = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -1059,7 +1053,7 @@
         }
       }
       
-      // Add "default" if it doesn't exist
+      // Add "default" template if it doesn't exist but legacy state does
       if (!templates.includes("default") && localStorage.getItem("shapeState")) {
         templates.push("default");
         localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
@@ -1085,7 +1079,7 @@
         templateNameSpan.textContent = template;
         item.appendChild(templateNameSpan);
         
-        // Add delete button
+        // Add delete button for non-default templates
         if (template !== "default") {
           const actions = document.createElement("div");
           actions.className = "template-item-actions";
@@ -1106,14 +1100,17 @@
       });
     }
 
+    // Get the saved order of templates
     function getTemplateOrder() {
       return JSON.parse(localStorage.getItem("templateOrder")) || [];
     }
 
+    // Save the order of templates
     function saveTemplateOrder(order) {
       localStorage.setItem("templateOrder", JSON.stringify(order));
     }
 
+    // Sort templates based on the saved order
     function sortTemplates(templates) {
       const order = getTemplateOrder();
       const ordered = [];
@@ -1127,13 +1124,13 @@
         }
       });
 
-      // Add any remaining templates (e.g., new ones) and sort them
+      // Add any remaining (new) templates and sort them alphabetically
       remaining.sort();
       
       return ordered.concat(remaining);
     }
 
-    // Drag and drop for templates
+    // --- Drag and drop for templates ---
     let draggedItem = null;
 
     templateList.addEventListener("dragstart", e => {
@@ -1160,7 +1157,6 @@
         currentOver.classList.remove("over");
       }
       if (afterElement == null) {
-        // Don't highlight if dragging over itself
         if (draggedItem !== templateList.lastChild) {
           templateList.lastChild.classList.add("over");
         }
@@ -1191,6 +1187,7 @@
       }
     });
 
+    // Helper function to determine drop position in the list
     function getDragAfterElement(container, y) {
       const draggableElements = [...container.querySelectorAll(".template-item:not(.dragging)")];
 
@@ -1205,8 +1202,11 @@
       }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
+    // --- Initialization ---
+
+    // Load the initial state of the application
     function loadState() {
-      // First check for templates
+      // Check for existing templates
       let templatesExist = false;
       for (let i = 0; i < localStorage.length; i++) {
         if (localStorage.key(i).startsWith("shapeTemplate_")) {
@@ -1215,9 +1215,8 @@
         }
       }
       
-      // If no templates exist, check for legacy state
+      // Migrate legacy state to default template if needed
       if (!templatesExist && localStorage.getItem("shapeState")) {
-        // Migrate old state to default template
         localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
       }
       
@@ -1229,17 +1228,14 @@
       loadControlPanelState();
     }
     
-    // XML Export/Import functions
+    // --- XML Export/Import ---
     function exportTemplateToXML() {
-      // Get currently selected template data
       const key = getTemplateKey(currentTemplate);
       const state = JSON.parse(localStorage.getItem(key)) || [];
       
-      // Create a simple XML string directly
       let xmlString = `<?xml version="1.0" encoding="UTF-8"?>\n`;
       xmlString += `<template name="${currentTemplate}">\n`;
       
-      // Add boxes
       state.forEach(box => {
         xmlString += `  <box x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" `;
         xmlString += `color="${box.color}" fontSize="${box.fontSize || 16}" `;
@@ -1248,10 +1244,9 @@
         xmlString += `  </box>\n`;
       });
       
-      // Close template
       xmlString += `</template>`;
       
-      // Create downloadable link
+      // Create a downloadable file
       const blob = new Blob([xmlString], {type: 'text/xml'});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1262,8 +1257,7 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      // Show notification
-      showNotification(`Template "${currentTemplate}" exported to XML`);
+      showNotification(`Template "${currentTemplate}" exported`);
     }
     
     // Helper function to escape XML special characters
@@ -1276,6 +1270,7 @@
         .replace(/'/g, '&apos;');
     }
     
+    // Import a template from an XML file
     function importTemplateFromXML(file) {
       const reader = new FileReader();
       
@@ -1284,16 +1279,13 @@
           const parser = new DOMParser();
           const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
           
-          // Check for parsing errors
           const parserError = xmlDoc.querySelector("parsererror");
           if (parserError) {
             throw new Error("XML parsing error");
           }
           
-          // Get template name
           const templateName = xmlDoc.documentElement.getAttribute("name") || "imported_template";
           
-          // Parse boxes
           const boxes = [];
           const boxElements = xmlDoc.getElementsByTagName("box");
           
@@ -1316,18 +1308,15 @@
             });
           }
           
-          // Save imported template
+          // Save and load the imported template
           currentTemplate = templateName;
           localStorage.setItem(getTemplateKey(templateName), JSON.stringify(boxes));
           
-          // Clear and load the imported template
           clearAllBoxes();
           loadBoxesFromState(boxes);
           
-          // Update UI
           updateTemplateList();
           
-          // Show notification
           showNotification(`Template "${templateName}" imported successfully`);
           
         } catch (error) {
@@ -1339,6 +1328,7 @@
       reader.readAsText(file);
     }
     
+    // Show a temporary notification message
     function showNotification(message) {
       notificationArea.textContent = message;
       notificationArea.classList.add("notification-visible");
@@ -1348,13 +1338,14 @@
       }, 3000);
     }
 
+    // Convert an RGB color string to a HEX string
     function rgbToHex(rgb) {
       const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
       return result ? "#" +
         (1 << 24 | result[1] << 16 | result[2] << 8 | result[3] << 0).toString(16).slice(1) : rgb;
     }
 
-    // Keyboard shortcuts
+    // --- Keyboard Shortcuts ---
     document.addEventListener("keydown", (e) => {
       // Ignore keyboard events when typing in inputs
       if (e.target.tagName === "INPUT") return;
@@ -1367,6 +1358,9 @@
       }
     });
 
+    // --- Control Panel Event Listeners ---
+
+    // Update box properties when control panel inputs change
     [inputX, inputY, inputWidth, inputHeight].forEach(input => {
       input.addEventListener("input", () => {
         if (!selectedBox) return;
@@ -1374,7 +1368,6 @@
         selectedBox.style.top = `${parseInt(inputY.value)}px`;
         selectedBox.style.width = `${parseInt(inputWidth.value)}px`;
         selectedBox.style.height = `${parseInt(inputHeight.value)}px`;
-        updateControls();
         saveState();
       });
     });
@@ -1405,7 +1398,7 @@
       }
     });
 
-    // Initialize color preview
+    // Initialize color preview on load
     updateColorPreview();
 
     // Font size controls
@@ -1437,11 +1430,12 @@
       saveState();
     });
 
-    // Box management
+    // Box management buttons
     addBoxBtn.addEventListener("click", () => createBox());
     duplicateBoxBtn.addEventListener("click", duplicateBox);
     resizerToggle.addEventListener("change", updateResizerVisibility);
 
+    // Z-index buttons
     bringForwardBtn.addEventListener("click", () => {
       if (selectedBox) {
         selectedBox.style.zIndex = zIndexCounter++;
@@ -1460,7 +1454,7 @@
       }
     });
     
-    // Template management
+    // Template management buttons
     saveTemplateBtn.addEventListener("click", saveTemplate);
     clearAllBtn.addEventListener("click", () => {
       if (confirm("Are you sure you want to clear all boxes?")) {
@@ -1469,30 +1463,33 @@
       }
     });
     
-    // Export/Import functionality
+    // Export/Import buttons
     exportBtn.addEventListener("click", exportTemplateToXML);
     importBtn.addEventListener("click", () => importFileInput.click());
     importFileInput.addEventListener("change", (e) => {
       if (e.target.files.length > 0) {
         const file = e.target.files[0];
         importTemplateFromXML(file);
-        // Reset file input so the same file can be selected again
+        // Reset file input to allow importing the same file again
         e.target.value = "";
       }
     });
     
-    // Initialize templates and load the state
+    // Initial setup on page load
     loadState();
     applyTransform(); // Apply initial transform
 
+    // --- Print Handling ---
     let originalPrintState = {};
 
     window.addEventListener('beforeprint', () => {
+      // Save current view state
       originalPrintState = { panX, panY, scale };
 
       const boxes = Array.from(document.querySelectorAll(".box"));
       if (boxes.length === 0) return;
 
+      // Calculate bounding box of all shapes
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
       boxes.forEach(box => {
@@ -1507,6 +1504,7 @@
 
       if (contentWidth <= 0 || contentHeight <= 0) return;
 
+      // Calculate scale and pan to fit all content on the page
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       
@@ -1524,6 +1522,7 @@
     });
 
     window.addEventListener('afterprint', () => {
+      // Restore original view state after printing
       if (originalPrintState) {
         panX = originalPrintState.panX;
         panY = originalPrintState.panY;
