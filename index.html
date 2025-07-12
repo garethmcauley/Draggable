@@ -619,34 +619,7 @@
     function loadControlPanelState() {
       const isHidden = localStorage.getItem("controlPanelHidden") === "true";
       toggleUIElements(isHidden);
-      
-      // Load position if saved
-      const left = localStorage.getItem("controlPanelLeft");
-      const top = localStorage.getItem("controlPanelTop");
-      const width = localStorage.getItem("controlPanelWidth");
-      const height = localStorage.getItem("controlPanelHeight");
-      
-      if (left && top) {
-        controlPanel.style.right = "auto";
-        controlPanel.style.left = left;
-        controlPanel.style.top = top;
-      }
-      
-      if (width && height) {
-        controlPanel.style.width = width;
-        controlPanel.style.height = height;
-      }
     }
-    
-    // Save control panel position and size when window unloads
-    window.addEventListener("beforeunload", () => {
-      if (controlPanel.style.left) {
-        localStorage.setItem("controlPanelLeft", controlPanel.style.left);
-        localStorage.setItem("controlPanelTop", controlPanel.style.top);
-        localStorage.setItem("controlPanelWidth", controlPanel.style.width);
-        localStorage.setItem("controlPanelHeight", controlPanel.style.height);
-      }
-    });
     
     // Color presets
     const presetColors = [
