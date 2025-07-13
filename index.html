@@ -133,12 +133,17 @@
     .hide-resizers .resizer {
       display: none;
     }
-    .box input.textbox {
+    .box .textbox {
       width: 90%;
+      height: 90%;
       border: none;
       background: transparent;
       text-align: center;
       font-size: 1rem;
+      resize: none; /* Prevent resizing */
+      overflow: hidden; /* Hide overflow */
+      font-family: inherit; /* Match the font of the box */
+      line-height: 1.2; /* Adjust line height for better readability */
     }
     #coords {
       position: absolute;
@@ -804,14 +809,19 @@
                 box.classList.add("white-bg");
             }
 
-            const textInput = document.createElement("input");
-            textInput.className = "textbox";
-            textInput.type = "text";
-            textInput.value = text;
-            textInput.style.fontSize = `${fontSize}px`;
-            textInput.addEventListener("input", () => {
-                if (box === selectedBox) inputText.value = textInput.value;
+            const textArea = document.createElement("textarea");
+            textArea.className = "textbox";
+            textArea.value = text;
+            textArea.style.fontSize = `${fontSize}px`;
+            textArea.addEventListener("input", () => {
+                if (box === selectedBox) inputText.value = textArea.value;
                 saveState();
+            });
+
+            // Prevent scrolling within the textarea
+            textArea.addEventListener("input", () => {
+                textArea.style.height = "auto"; // Reset height
+                textArea.style.height = `${textArea.scrollHeight}px`; // Adjust to content
             });
 
             // Create resizers
@@ -821,7 +831,7 @@
                 box.appendChild(resizer);
             });
 
-            box.appendChild(textInput);
+            box.appendChild(textArea);
 
             // Event listener for starting to drag a box
             box.addEventListener("mousedown", (e) => {
@@ -1444,6 +1454,9 @@
                     updateTemplateList();
 
                     showNotification(`Template "${templateName}" imported successfully`);
+
+                    // Set the last viewed template in local storage
+                    localStorage.setItem("lastViewedTemplate", templateName);
 
                 } catch (error) {
                     console.error("Import error:", error);
