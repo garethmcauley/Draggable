@@ -1,0 +1,45 @@
+Draggable License Agreement
+===========================
+
+Copyright © Gareth McAuley. All Rights Reserved.
+
+This software and its associated source code (collectively, “Draggable”) is the intellectual property of Gareth McAuley and is protected by copyright law.
+
+By accessing, downloading, or using any part of Draggable, you agree to the following terms:
+
+1. LICENSE GRANT
+   ----------------
+   Draggable is available strictly on a paid license basis. Use of this software is permitted only to individuals or entities that have purchased a valid license key from the copyright holder.
+
+   A time-limited demo key (7 days) may be issued solely for evaluation purposes. Any continued use beyond the demo period requires the purchase of a full license.
+
+2. RESTRICTIONS
+   ----------------
+   - The use, distribution, copying, modification, or sublicensing of the source code, in whole or in part, is strictly prohibited.
+   - You may not reverse engineer, decompile, or disassemble Draggable or attempt to derive the source code.
+   - Redistribution of Draggable or any part thereof, whether modified or unmodified, is prohibited without the express written consent of the copyright holder.
+   - Draggable may not be used in any commercial or public-facing environment without a valid commercial license agreement.
+
+3. INTELLECTUAL PROPERTY
+   ------------------------
+   Draggable, its name, logo, content, source code, and any associated assets are the exclusive property of Gareth McAuley. All rights not expressly granted herein are reserved.
+
+4. COMMERCIAL LICENSE
+   ---------------------
+   For permission to use, distribute, or integrate Draggable in a commercial product or environment, you must obtain a commercial license agreement. Please contact:
+
+   support@garethmcauley.com
+
+5. TERMINATION
+   ---------------
+   Any violation of this license will result in immediate termination of access to Draggable. Legal action may be taken for unauthorized use or distribution.
+
+6. DISCLAIMER
+   -------------
+   This software is provided “as is,” without warranty of any kind, express or implied. In no event shall the copyright holder be liable for any damages arising from the use of this software.
+
+---
+
+For licensing inquiries, demo access, or bulk license pricing, please contact:
+
+**Email:** support@garethmcauley.com

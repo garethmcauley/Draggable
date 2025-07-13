@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-R856B0JZYT"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-R856B0JZYT');
+</script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Draggable</title>
+  <style>
+      #licenseOverlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5); /* Semi-translucent background */
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+      }
+
+      .overlay-content {
+          background: #fff; /* White modal background */
+          padding: 20px;
+          border-radius: 8px;
+          text-align: center;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Subtle shadow for the modal */
+      }
+
+      input, button {
+          padding: 10px;
+          margin-top: 10px;
+          width: 100%;
+          box-sizing: border-box;
+      }
+
+      .message {
+          margin-top: 20px;
+          font-weight: bold;
+      }
+
+      .success {
+          color: green;
+      }
+
+      .error {
+          color: red;
+      }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #f0f0f0;
+    }
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform-origin: 0 0;
+    }
+    .box {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background-color: lightblue;
+      box-sizing: border-box;
+      border: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .selected {
+      border-color: blue;
+      box-shadow: 0 0 8px rgba(0, 0, 255, 0.5);
+    }
+    .white-bg {
+      background-color: white !important;
+    }
+    .white-bg.selected {
+      border-color: #0066ff;
+      box-shadow: 0 0 8px rgba(0, 102, 255, 0.5);
+    }
+    .hide-ui-mode .selected {
+      border-color: transparent !important;
+      box-shadow: none !important;
+    }
+    .hide-ui-mode .resizer {
+      display: none !important;
+    }
+    .resizer {
+      width: 10px;
+      height: 10px;
+      background: #000;
+      position: absolute;
+    }
+    .resizer.right {
+      right: -5px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: ew-resize;
+    }
+    .resizer.bottom {
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: ns-resize;
+    }
+    .resizer.corner {
+      bottom: -5px;
+      right: -5px;
+      cursor: se-resize;
+    }
+    .hide-resizers .resizer {
+      display: none;
+    }
+    .box input.textbox {
+      width: 90%;
+      border: none;
+      background: transparent;
+      text-align: center;
+      font-size: 1rem;
+    }
+    #coords {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+    }
+    #coords.hidden {
+      display: none;
+    }
+    #control-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border: 1px solid #ccc;
+      width: 220px;
+      max-height: 90vh;
+      overflow-y: auto;
+      z-index: 1000;
+      resize: both;
+      overflow: auto;
+    }
+    #control-panel-header {
+      position: sticky;
+      top: -10px;
+      padding: 5px;
+      cursor: move;
+      background: #f0f0f0;
+      margin: -10px -10px 10px -10px;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1;
+    }
+    #control-panel.hidden {
+      display: none;
+    }
+    #control-panel-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    #control-panel-toggle:hover {
+      background: rgba(240,240,240,0.9);
+    }
+    #control-panel label {
+      display: block;
+      margin: 5px 0 2px;
+    }
+    #control-panel input[type="number"],
+    #control-panel input[type="text"],
+    #control-panel input[type="color"],
+    #control-panel input[type="file"],
+    #control-panel button {
+      width: 100%;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+    #resizerToggle {
+      margin-top: 10px;
+    }
+    .font-size-controls {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .font-size-controls button {
+      width: 30%;
+      font-weight: bold;
+    }
+    .action-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .action-buttons button {
+      width: 48%;
+    }
+    #keyboard-shortcuts {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+      font-size: 12px;
+    }
+    #keyboard-shortcuts.hidden {
+      display: none;
+    }
+    #keyboard-shortcuts ul {
+      margin: 5px 0;
+      padding-left: 20px;
+    }
+    .color-control {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 10px;
+    }
+    .color-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .color-picker-main {
+      flex: 1;
+    }
+    #opacity-control {
+      width: 100%;
+      margin: 5px 0;
+    }
+    .color-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin: 5px 0;
+    }
+    .color-preset {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 1px solid #aaa;
+    }
+    .current-color-preview {
+      width: 30px;
+      height: 30px;
+      margin-right: 10px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+    .template-section {
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
+      margin-top: 10px;
+    }
+    .template-section h3 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+    .template-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .template-actions button {
+      width: 48%;
+    }
+    .template-list {
+      margin-top: 8px;
+      max-height: 120px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+    .template-item {
+      padding: 5px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #eee;
+    }
+    .template-item:hover {
+      background-color: #f0f0f0;
+    }
+    .template-item.dragging {
+      opacity: 0.5;
+    }
+    .template-item.over {
+      background-color: #d0e0f0;
+    }
+    .template-item-actions {
+      display: flex;
+    }
+    .template-item-actions button {
+      padding: 2px 5px;
+      margin-left: 3px;
+      font-size: 10px;
+      width: auto;
+    }
+    #templateNameInput {
+      margin-bottom: 8px;
+    }
+    .export-import-section {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
+    }
+    .export-import-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .export-import-buttons button {
+      width: 48%;
+    }
+    #importFileInput {
+      display: none;
+    }
+    #notificationArea {
+      position: fixed;
+      bottom: 20px;
+      right: 240px;
+      padding: 10px 15px;
+      background-color: rgba(0, 128, 0, 0.8);
+      color: white;
+      border-radius: 5px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .notification-visible {
+      opacity: 1 !important;
+    }
+
+    @media print {
+      body {
+        overflow: visible !important;
+      }
+
+      #control-panel,
+      #control-panel-toggle,
+      #coords,
+      #keyboard-shortcuts,
+      #notificationArea,
+      .resizer {
+        display: none !important;
+      }
+
+      #container {
+        width: auto;
+        height: auto;
+        overflow: visible;
+        background-color: transparent;
+      }
+
+      .box {
+        border-color: transparent !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+    <div id="licenseOverlay">
+        <div class="overlay-content">
+            <h2>Enter Your License Key</h2>
+            <input type="text" id="licenseKey" placeholder="Enter your license key">
+            <button id="validateBtn">Submit</button>
+            <div id="message" class="message"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        const secretKey = 'your-super-secret-key-that-is-long-and-random'; // Same key as used in the generator
+
+        // Check if a valid license key is already stored
+        const storedKey = localStorage.getItem('licenseKey');
+        if (storedKey) {
+            try {
+                const bytes = CryptoJS.AES.decrypt(storedKey, secretKey);
+                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                const licenseData = JSON.parse(decryptedData);
+                const expiryDate = new Date(licenseData.expiryDate);
+                const now = new Date();
+
+                if (expiryDate > now) {
+                    document.getElementById('licenseOverlay').style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Invalid stored key:', e);
+            }
+        }
+
+        // Validate the license key
+        document.getElementById('validateBtn').addEventListener('click', () => {
+            const licenseKey = document.getElementById('licenseKey').value.trim();
+            const messageDiv = document.getElementById('message');
+
+            if (!licenseKey) {
+                messageDiv.textContent = 'Please enter a license key.';
+                messageDiv.className = 'message error';
+                return;
+            }
+
+            try {
+                const bytes = CryptoJS.AES.decrypt(licenseKey, secretKey);
+                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+
+                if (decryptedData) {
+                    const licenseData = JSON.parse(decryptedData);
+                    const expiryDate = new Date(licenseData.expiryDate);
+                    const now = new Date();
+
+                    if (expiryDate > now) {
+                        localStorage.setItem('licenseKey', licenseKey);
+                        messageDiv.textContent = 'License key is valid. Access granted.';
+                        messageDiv.className = 'message success';
+                        setTimeout(() => {
+                            document.getElementById('licenseOverlay').style.display = 'none';
+                        }, 1000);
+                    } else {
+                        messageDiv.textContent = 'License key has expired. Please contact support@garethmcauley.com';
+                        messageDiv.className = 'message error';
+                    }
+                } else {
+                    throw new Error('Invalid key');
+                }
+            } catch (e) {
+                messageDiv.textContent = 'Invalid license key. Please contact support@garethmcauley.com';
+                messageDiv.className = 'message error';
+            }
+        });
+    </script>
+
+    <div id="container">
+        <div id="canvas"></div>
+        <div id="coords">X: 0, Y: 0</div>
+        <div id="control-panel-toggle">⚙️</div>
+        <div id="control-panel">
+            <div id="control-panel-header">
+                <span>Control Panel</span>
+                <span style="cursor:pointer" id="control-panel-close">✖</span>
+            </div>
+            <label for="inputX">X Position</label>
+            <input type="number" id="inputX">
+            <label for="inputY">Y Position</label>
+            <input type="number" id="inputY">
+            <label for="inputWidth">Width</label>
+            <input type="number" id="inputWidth">
+            <label for="inputHeight">Height</label>
+            <input type="number" id="inputHeight">
+            <label for="inputText">Text</label>
+            <input type="text" id="inputText">
+
+            <label>Box Color</label>
+            <div class="color-control">
+                <div class="color-row">
+                    <div id="colorPreview" class="current-color-preview"></div>
+                    <input type="color" id="inputColor" value="#add8e6" class="color-picker-main">
+                </div>
+                <label for="opacity-control">Opacity: <span id="opacityValue">100%</span></label>
+                <input type="range" id="opacity-control" min="0" max="100" value="100">
+                <div class="color-presets" id="colorPresets">
+                    <!-- Color presets will be added via JavaScript -->
+                </div>
+            </div>
+
+            <label for="inputFontSize">Font Size</label>
+            <div class="font-size-controls">
+                <button id="decreaseFontBtn">-</button>
+                <input type="number" id="inputFontSize" min="8" max="72" value="16">
+                <button id="increaseFontBtn">+</button>
+            </div>
+            <div class="action-buttons">
+                <button id="addBoxBtn">Add Box</button>
+                <button id="duplicateBoxBtn">Duplicate</button>
+            </div>
+            <div class="action-buttons">
+                <button id="bringForwardBtn">Bring Forward</button>
+                <button id="sendBackwardBtn">Send Backward</button>
+            </div>
+            <label style="display: none;"><input type="checkbox" id="resizerToggle" checked> Show Resizers</label>
+
+            <!-- Template system -->
+            <div class="template-section">
+                <h3>Templates</h3>
+                <input type="text" id="templateNameInput" placeholder="Template name">
+                <div class="template-actions">
+                    <button id="saveTemplateBtn">Save Template</button>
+                    <button id="clearAllBtn">Clear All</button>
+                </div>
+                <div class="template-list" id="templateList">
+                    <!-- Template list will be populated here -->
+                </div>
+
+                <!-- Export/Import section -->
+                <div class="export-import-section">
+                    <h3>Export/Import</h3>
+                    <div class="export-import-buttons">
+                        <button id="exportBtn">Export</button>
+                        <button id="importBtn">Import</button>
+                    </div>
+                    <input type="file" id="importFileInput" accept=".txt">
+                </div>
+            </div>
+        </div>
+        <div id="keyboard-shortcuts">
+            <b>Keyboard Shortcuts:</b>
+            <ul>
+                <li>Del - Delete selected box</li>
+                <li>Ctrl+D - Duplicate selected box</li>
+            </ul>
+        </div>
+        <div id="notificationArea"></div>
+    </div>
+
+    <script>
+        // DOM element references
+        const container = document.getElementById("container");
+        const canvas = document.getElementById("canvas");
+        const coords = document.getElementById("coords");
+        const controlPanel = document.getElementById("control-panel");
+        const controlPanelHeader = document.getElementById("control-panel-header");
+        const controlPanelToggle = document.getElementById("control-panel-toggle");
+        const controlPanelClose = document.getElementById("control-panel-close");
+        const keyboardShortcuts = document.getElementById("keyboard-shortcuts");
+        const inputX = document.getElementById("inputX");
+        const inputY = document.getElementById("inputY");
+        const inputWidth = document.getElementById("inputWidth");
+        const inputHeight = document.getElementById("inputHeight");
+        const inputText = document.getElementById("inputText");
+        const inputColor = document.getElementById("inputColor");
+        const colorPreview = document.getElementById("colorPreview");
+        const opacityControl = document.getElementById("opacity-control");
+        const opacityValue = document.getElementById("opacityValue");
+        const colorPresets = document.getElementById("colorPresets");
+        const inputFontSize = document.getElementById("inputFontSize");
+        const decreaseFontBtn = document.getElementById("decreaseFontBtn");
+        const increaseFontBtn = document.getElementById("increaseFontBtn");
+        const addBoxBtn = document.getElementById("addBoxBtn");
+        const duplicateBoxBtn = document.getElementById("duplicateBoxBtn");
+        const bringForwardBtn = document.getElementById("bringForwardBtn");
+        const sendBackwardBtn = document.getElementById("sendBackwardBtn");
+        const resizerToggle = document.getElementById("resizerToggle");
+        const templateNameInput = document.getElementById("templateNameInput");
+        const saveTemplateBtn = document.getElementById("saveTemplateBtn");
+        const clearAllBtn = document.getElementById("clearAllBtn");
+        const templateList = document.getElementById("templateList");
+        const exportBtn = document.getElementById("exportBtn");
+        const importBtn = document.getElementById("importBtn");
+        const importFileInput = document.getElementById("importFileInput");
+        const notificationArea = document.getElementById("notificationArea");
+
+        // Global state variables
+        let selectedBox = null;
+        let isDragging = false;
+        let offsetX = 0, offsetY = 0;
+        let isResizing = false, currentResizer;
+        let originalWidth, originalHeight, originalX, originalY;
+        let currentOpacity = 100;
+        let currentTemplate = "default";
+        let controlPanelDragging = false;
+        let controlPanelOffsetX = 0, controlPanelOffsetY = 0;
+        let zIndexCounter = 1;
+        let autoHidden = false;
+
+        // Canvas navigation state
+        let scale = 1;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let panStartX = 0, panStartY = 0;
+        let hasPanned = false;
+
+        // Apply CSS transform for panning and zooming
+        function applyTransform() {
+            canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        }
+
+        // Panning and Zooming event listeners
+        container.addEventListener("mousedown", (e) => {
+            // Start panning if the mousedown is on the container or canvas
+            if (e.target === container || e.target === canvas) {
+                isPanning = true;
+                hasPanned = false; // Reset pan state on new mousedown
+                panStartX = e.clientX - panX;
+                panStartY = e.clientY - panY;
+                container.style.cursor = "grabbing";
+            }
+        });
+
+        container.addEventListener("wheel", (e) => {
+            // Prevent zooming while scrolling inside the control panel
+            if (controlPanel.contains(e.target)) {
+                return;
+            }
+            e.preventDefault();
+
+            // Calculate scale and pan values for zooming
+            const scaleAmount = e.deltaY > 0 ? 0.9 : 1.1;
+            const mouseX = e.clientX - container.getBoundingClientRect().left;
+            const mouseY = e.clientY - container.getBoundingClientRect().top;
+
+            const newPanX = mouseX - (mouseX - panX) * scaleAmount;
+            const newPanY = mouseY - (mouseY - panY) * scaleAmount;
+
+            panX = newPanX;
+            panY = newPanY;
+            scale *= scaleAmount;
+
+            applyTransform();
+            updateCoords(e);
+        }, { passive: false });
+
+        // Update the coordinate display
+        function updateCoords(e) {
+            const canvasX = (e.clientX - panX) / scale;
+            const canvasY = (e.clientY - panY) / scale;
+            coords.textContent = `X: ${Math.round(canvasX)}, Y: ${Math.round(canvasY)}`;
+        }
+        container.addEventListener("mousemove", updateCoords);
+
+        // Control panel dragging logic
+        controlPanelHeader.addEventListener("mousedown", (e) => {
+            if (e.target === controlPanelClose) return;
+            controlPanelDragging = true;
+            controlPanelOffsetX = e.clientX - controlPanel.getBoundingClientRect().left;
+            controlPanelOffsetY = e.clientY - controlPanel.getBoundingClientRect().top;
+        });
+
+        // Global mousemove handler for all dragging/resizing/panning
+        document.addEventListener("mousemove", (e) => {
+            // Handle canvas panning
+            if (isPanning) {
+                hasPanned = true;
+                panX = e.clientX - panStartX;
+                panY = e.clientY - panStartY;
+                applyTransform();
+                return;
+            }
+
+            // Handle control panel dragging
+            if (controlPanelDragging) {
+                controlPanel.style.right = "auto"; // Remove right positioning
+                controlPanel.style.left = `${e.clientX - controlPanelOffsetX}px`;
+                controlPanel.style.top = `${e.clientY - controlPanelOffsetY}px`;
+                e.preventDefault();
+            } else if (isDragging && selectedBox) {
+                // Handle box dragging
+                const mouseCanvasX = (e.clientX - panX) / scale;
+                const mouseCanvasY = (e.clientY - panY) / scale;
+                selectedBox.style.left = `${mouseCanvasX - offsetX}px`;
+                selectedBox.style.top = `${mouseCanvasY - offsetY}px`;
+                updateControls();
+                saveState();
+            } else if (isResizing && selectedBox) {
+                // Handle box resizing
+                const dx = (e.clientX - originalX) / scale;
+                const dy = (e.clientY - originalY) / scale;
+                if (currentResizer.classList.contains("right")) {
+                    selectedBox.style.width = `${originalWidth + dx}px`;
+                } else if (currentResizer.classList.contains("bottom")) {
+                    selectedBox.style.height = `${originalHeight + dy}px`;
+                } else if (currentResizer.classList.contains("corner")) {
+                    selectedBox.style.width = `${originalWidth + dx}px`;
+                    selectedBox.style.height = `${originalHeight + dy}px`;
+                }
+                updateControls();
+                saveState();
+            }
+        });
+
+        // Global mouseup handler to end all dragging/resizing/panning
+        document.addEventListener("mouseup", (e) => {
+            if (isPanning) {
+                // If it was a click (not a pan), deselect the box
+                if (!hasPanned && (e.target === container || e.target === canvas)) {
+                    selectBox(null);
+                    if (!controlPanel.classList.contains("hidden")) {
+                        autoHidden = true;
+                        toggleUIElements(true);
+                    }
+                }
+                isPanning = false;
+                container.style.cursor = "default";
+            }
+            controlPanelDragging = false;
+            isDragging = false;
+            isResizing = false;
+        });
+
+        // Toggle visibility of UI elements
+        function toggleUIElements(isHidden) {
+            controlPanel.classList.toggle("hidden", isHidden);
+            keyboardShortcuts.classList.toggle("hidden", isHidden);
+            coords.classList.toggle("hidden", isHidden);
+            container.classList.toggle("hide-ui-mode", isHidden);
+
+            // Save the visibility state
+            localStorage.setItem("controlPanelHidden", isHidden);
+        }
+
+        // Event listeners for control panel toggle and close buttons
+        controlPanelToggle.addEventListener("click", () => {
+            const willBeHidden = !controlPanel.classList.contains("hidden");
+            autoHidden = false; // Manual toggle
+            toggleUIElements(willBeHidden);
+        });
+
+        controlPanelClose.addEventListener("click", () => {
+            autoHidden = false; // Manual close
+            toggleUIElements(true);
+        });
+
+        // Load control panel visibility state on page load
+        function loadControlPanelState() {
+            const isHidden = localStorage.getItem("controlPanelHidden") === "true";
+            toggleUIElements(isHidden);
+        }
+
+        // Color presets for the color picker
+        const presetColors = [
+            "#ff0000", "#ff9900", "#ffff00", "#00ff00",
+            "#00ffff", "#0000ff", "#9900ff", "#ff00ff",
+            "#ffffff", "#000000", "#add8e6", "#90ee90",
+            "#ffb6c1", "#ffa07a", "#dda0dd", "#f0e68c"
+        ];
+
+        // Initialize color presets in the UI
+        presetColors.forEach(color => {
+            const preset = document.createElement("div");
+            preset.className = "color-preset";
+            preset.style.backgroundColor = color;
+            preset.addEventListener("click", () => {
+                inputColor.value = color;
+                updateColorPreview();
+                if (selectedBox) {
+                    applyColorToBox(selectedBox);
+                    saveState();
+                }
+            });
+            colorPresets.appendChild(preset);
+        });
+
+        // Create a new box element
+        function createBox(x = 100, y = 100, width = 200, height = 200, text = "", color = "rgba(173, 216, 230, 1)", fontSize = 16, zIndex = null) {
+            const box = document.createElement("div");
+            box.classList.add("box");
+            box.style.left = `${x}px`;
+            box.style.top = `${y}px`;
+            box.style.width = `${width}px`;
+            box.style.height = `${height}px`;
+            box.style.backgroundColor = color;
+            box.style.zIndex = zIndex === null ? zIndexCounter++ : zIndex;
+
+            // Add white-bg class for better visibility on white backgrounds
+            if (color === "#ffffff" || color === "rgb(255, 255, 255)" || color === "rgba(255, 255, 255, 1)" ||
+                (color.startsWith("rgba(") && color.includes("255, 255, 255"))) {
+                box.classList.add("white-bg");
+            }
+
+            const textInput = document.createElement("input");
+            textInput.className = "textbox";
+            textInput.type = "text";
+            textInput.value = text;
+            textInput.style.fontSize = `${fontSize}px`;
+            textInput.addEventListener("input", () => {
+                if (box === selectedBox) inputText.value = textInput.value;
+                saveState();
+            });
+
+            // Create resizers
+            ["right", "bottom", "corner"].forEach(pos => {
+                const resizer = document.createElement("div");
+                resizer.classList.add("resizer", pos);
+                box.appendChild(resizer);
+            });
+
+            box.appendChild(textInput);
+
+            // Event listener for starting to drag a box
+            box.addEventListener("mousedown", (e) => {
+                if (!e.target.classList.contains("resizer")) {
+                    selectBox(box);
+                    isDragging = true;
+                    const mouseCanvasX = (e.clientX - panX) / scale;
+                    const mouseCanvasY = (e.clientY - panY) / scale;
+                    offsetX = mouseCanvasX - box.offsetLeft;
+                    offsetY = mouseCanvasY - box.offsetTop;
+                }
+            });
+
+            // Right-click context menu to delete a box
+            box.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                if (confirm("Delete this box?")) {
+                    if (box === selectedBox) {
+                        selectBox(null);
+                    }
+                    box.remove();
+                    saveState();
+                }
+            });
+
+            // Double-click to toggle UI visibility
+            box.addEventListener("dblclick", (e) => {
+                if (container.classList.contains("hide-ui-mode")) {
+                    toggleUIElements(false);
+                }
+                e.stopPropagation();
+            });
+
+            // Event listeners for resizers
+            const resizers = box.querySelectorAll(".resizer");
+            resizers.forEach(resizer => {
+                resizer.addEventListener("mousedown", (e) => {
+                    currentResizer = resizer;
+                    originalWidth = parseFloat(box.style.width);
+                    originalHeight = parseFloat(box.style.height);
+                    originalX = e.clientX;
+                    originalY = e.clientY;
+                    isResizing = true;
+                    e.stopPropagation();
+                });
+            });
+
+            box.addEventListener("click", () => selectBox(box));
+            canvas.appendChild(box);
+            selectBox(box);
+            saveState();
+
+            return box;
+        }
+
+        // Duplicate the currently selected box
+        function duplicateBox() {
+            if (!selectedBox) return;
+
+            const textInput = selectedBox.querySelector(".textbox");
+            const fontSize = parseInt(textInput.style.fontSize) || 16;
+
+            // Create a new box with a slight offset
+            const newBox = createBox(
+                selectedBox.offsetLeft + 20,
+                selectedBox.offsetTop + 20,
+                selectedBox.offsetWidth,
+                selectedBox.offsetHeight,
+                textInput.value,
+                selectedBox.style.backgroundColor,
+                fontSize,
+                zIndexCounter++
+            );
+
+            selectBox(newBox);
+        }
+
+        // Delete the currently selected box
+        function deleteSelectedBox() {
+            if (!selectedBox) return;
+
+            selectedBox.remove();
+            selectedBox = null;
+            updateControls();
+            saveState();
+        }
+
+        // Select a box and update its state
+        function selectBox(box) {
+            // Deselect old box if it exists
+            if (selectedBox) {
+                selectedBox.classList.remove("selected");
+                selectedBox.classList.add("hide-resizers");
+            }
+
+            selectedBox = box;
+
+            // Select new box if it exists
+            if (selectedBox) {
+                selectedBox.classList.add("selected");
+                updateResizerVisibility(); // This will remove hide-resizers if checkbox is checked
+                updateControls();
+
+                // Show control panel if it was auto-hidden
+                if (controlPanel.classList.contains("hidden") && autoHidden) {
+                    toggleUIElements(false);
+                }
+                autoHidden = false;
+            } else {
+                // Clear controls if no box is selected
+                updateControls();
+            }
+        }
+
+        // Update the control panel with the selected box's properties
+        function updateControls() {
+            if (!selectedBox) {
+                inputX.value = "";
+                inputY.value = "";
+                inputWidth.value = "";
+                inputHeight.value = "";
+                inputText.value = "";
+                return;
+            }
+            const textInput = selectedBox.querySelector(".textbox");
+            inputX.value = Math.round(parseFloat(selectedBox.style.left));
+            inputY.value = Math.round(parseFloat(selectedBox.style.top));
+            inputWidth.value = Math.round(parseFloat(selectedBox.style.width));
+            inputHeight.value = Math.round(parseFloat(selectedBox.style.height));
+            inputText.value = textInput.value;
+
+            // Update color controls
+            const bgColor = selectedBox.style.backgroundColor;
+            updateColorControlsFromBoxColor(bgColor);
+
+            // Update font size control
+            const currentFontSize = parseInt(textInput.style.fontSize) || 16;
+            inputFontSize.value = currentFontSize;
+
+            // Update coordinate display
+            coords.textContent = `X: ${Math.round(parseFloat(selectedBox.style.left))}, Y: ${Math.round(parseFloat(selectedBox.style.top))}`;
+        }
+
+        // Update color picker and opacity slider from a box's color
+        function updateColorControlsFromBoxColor(bgColor) {
+            const rgba = parseRGBA(bgColor);
+            if (rgba) {
+                const hexColor = rgbToHex(`rgb(${rgba.r},${rgba.g},${rgba.b})`);
+                inputColor.value = hexColor;
+
+                currentOpacity = Math.round(rgba.a * 100);
+                opacityControl.value = currentOpacity;
+                opacityValue.textContent = `${currentOpacity}%`;
+
+                updateColorPreview();
+            }
+        }
+
+        // Parse an RGBA color string into an object
+        function parseRGBA(rgba) {
+            if (rgba.startsWith('#')) {
+                return { r: 0, g: 0, b: 0, a: 1 }; // Should not happen with current logic, but good fallback
+            }
+
+            const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/);
+            if (match) {
+                return {
+                    r: parseInt(match[1]),
+                    g: parseInt(match[2]),
+                    b: parseInt(match[3]),
+                    a: match[4] ? parseFloat(match[4]) : 1
+                };
+            }
+
+            return null;
+        }
+
+        // Update the color preview swatch
+        function updateColorPreview() {
+            const hexColor = inputColor.value;
+            const opacity = opacityControl.value / 100;
+            const rgba = hexToRGBA(hexColor, opacity);
+            colorPreview.style.backgroundColor = rgba;
+        }
+
+        // Convert a HEX color and alpha value to an RGBA string
+        function hexToRGBA(hex, alpha = 1) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        // Apply the current color and opacity to a box
+        function applyColorToBox(box) {
+            if (!box) return;
+            const hexColor = inputColor.value;
+            const opacity = opacityControl.value / 100;
+            const rgba = hexToRGBA(hexColor, opacity);
+            box.style.backgroundColor = rgba;
+
+            // Toggle white-bg class for better border visibility
+            if (hexColor === "#ffffff" && opacity >= 0.9) {
+                box.classList.add("white-bg");
+            } else {
+                box.classList.remove("white-bg");
+            }
+        }
+
+        // Toggle visibility of resizers based on the checkbox
+        function updateResizerVisibility() {
+            if (selectedBox) {
+                selectedBox.classList.toggle("hide-resizers", !resizerToggle.checked);
+            }
+        }
+
+        // --- Template Management ---
+
+        // Get the local storage key for a template
+        function getTemplateKey(templateName) {
+            return `shapeTemplate_${templateName}`;
+        }
+
+        // Save the current state of all boxes to local storage
+        function saveState() {
+            const state = getStateObject();
+            localStorage.setItem(getTemplateKey(currentTemplate), JSON.stringify(state));
+
+            // For backward compatibility with older versions
+            if (currentTemplate === "default") {
+                localStorage.setItem("shapeState", JSON.stringify(state));
+            }
+        }
+
+        // Get an object representing the state of all boxes
+        function getStateObject() {
+            return Array.from(document.querySelectorAll(".box")).map(box => {
+                const textInput = box.querySelector(".textbox");
+                const fontSize = parseInt(textInput.style.fontSize) || 16;
+                return {
+                    x: box.offsetLeft,
+                    y: box.offsetTop,
+                    width: box.offsetWidth,
+                    height: box.offsetHeight,
+                    text: textInput.value,
+                    color: box.style.backgroundColor,
+                    fontSize: fontSize,
+                    isWhite: box.classList.contains("white-bg"),
+                    zIndex: parseInt(box.style.zIndex) || 0
+                };
+            });
+        }
+
+        // Load a template from local storage
+        function loadTemplate(templateName) {
+            clearAllBoxes();
+
+            currentTemplate = templateName;
+
+            const key = getTemplateKey(templateName);
+            const state = JSON.parse(localStorage.getItem(key)) || [];
+
+            loadBoxesFromState(state);
+
+            updateTemplateList();
+
+            // Remember the last viewed template
+            localStorage.setItem("lastViewedTemplate", templateName);
+        }
+
+        // Create boxes from a state object
+        function loadBoxesFromState(state) {
+            let maxZ = 0;
+            state.forEach(s => {
+                const box = createBox(s.x, s.y, s.width, s.height, s.text, s.color, s.fontSize || 16, s.zIndex);
+                if (s.zIndex > maxZ) {
+                    maxZ = s.zIndex;
+                }
+                if (s.isWhite || (s.color &&
+                    (s.color === "#ffffff" || s.color === "rgb(255, 255, 255)" || s.color === "rgba(255, 255, 255, 1)" ||
+                        (s.color.startsWith("rgba(") && s.color.includes("255, 255, 255"))))) {
+                    box.classList.add("white-bg");
+                }
+            });
+            zIndexCounter = maxZ + 1;
+        }
+
+        // Save the current canvas as a new template
+        function saveTemplate() {
+            let templateName = templateNameInput.value.trim();
+
+            if (!templateName) {
+                alert("Please enter a template name");
+                return;
+            }
+
+            currentTemplate = templateName;
+            saveState();
+
+            // Add to template order for drag-and-drop
+            const order = getTemplateOrder();
+            if (!order.includes(templateName)) {
+                order.push(templateName);
+                saveTemplateOrder(order);
+            }
+
+            updateTemplateList();
+
+            // Set as last viewed
+            localStorage.setItem("lastViewedTemplate", templateName);
+
+            templateNameInput.value = "";
+            showNotification(`Template "${templateName}" saved`);
+        }
+
+        // Delete a template from local storage
+        function deleteTemplate(templateName) {
+            if (confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
+                localStorage.removeItem(getTemplateKey(templateName));
+
+                // Remove from template order
+                const order = getTemplateOrder();
+                const index = order.indexOf(templateName);
+                if (index > -1) {
+                    order.splice(index, 1);
+                    saveTemplateOrder(order);
+                }
+
+                // If we deleted the current template, switch to default
+                if (currentTemplate === templateName) {
+                    loadTemplate("default");
+                } else {
+                    updateTemplateList();
+                }
+            }
+        }
+
+        // Clear all boxes from the canvas
+        function clearAllBoxes() {
+            const boxes = document.querySelectorAll(".box");
+            boxes.forEach(box => box.remove());
+            selectedBox = null;
+        }
+
+        // Update the template list in the control panel
+        function updateTemplateList() {
+            templateList.innerHTML = "";
+
+            // Get all template keys from local storage
+            const templates = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith("shapeTemplate_")) {
+                    templates.push(key.replace("shapeTemplate_", ""));
+                }
+            }
+
+            // Add "default" template if it doesn't exist but legacy state does
+            if (!templates.includes("default") && localStorage.getItem("shapeState")) {
+                templates.push("default");
+                localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
+            }
+
+            // Sort templates based on saved order
+            const orderedTemplates = sortTemplates(templates);
+
+            // Add each template to the list
+            orderedTemplates.forEach(template => {
+                const item = document.createElement("div");
+                item.className = "template-item";
+                item.dataset.templateName = template;
+                item.draggable = true;
+                item.addEventListener("click", () => loadTemplate(template));
+
+                // Mark current template
+                if (template === currentTemplate) {
+                    item.style.fontWeight = "bold";
+                }
+
+                const templateNameSpan = document.createElement("span");
+                templateNameSpan.textContent = template;
+                item.appendChild(templateNameSpan);
+
+                // Add delete button for non-default templates
+                if (template !== "default") {
+                    const actions = document.createElement("div");
+                    actions.className = "template-item-actions";
+
+                    const deleteBtn = document.createElement("button");
+                    deleteBtn.textContent = "×";
+                    deleteBtn.title = "Delete this template";
+                    deleteBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        deleteTemplate(template);
+                    });
+
+                    actions.appendChild(deleteBtn);
+                    item.appendChild(actions);
+                }
+
+                templateList.appendChild(item);
+            });
+        }
+
+        // Get the saved order of templates
+        function getTemplateOrder() {
+            return JSON.parse(localStorage.getItem("templateOrder")) || [];
+        }
+
+        // Save the order of templates
+        function saveTemplateOrder(order) {
+            localStorage.setItem("templateOrder", JSON.stringify(order));
+        }
+
+        // Sort templates based on the saved order
+        function sortTemplates(templates) {
+            const order = getTemplateOrder();
+            const ordered = [];
+            const remaining = [...templates];
+
+            // Add templates in the saved order
+            order.forEach(templateName => {
+                const index = remaining.indexOf(templateName);
+                if (index > -1) {
+                    ordered.push(remaining.splice(index, 1)[0]);
+                }
+            });
+
+            // Add any remaining (new) templates and sort them alphabetically
+            remaining.sort();
+
+            return ordered.concat(remaining);
+        }
+
+        // --- Drag and drop for templates ---
+        let draggedItem = null;
+
+        templateList.addEventListener("dragstart", e => {
+            if (e.target.classList.contains("template-item")) {
+                draggedItem = e.target;
+                setTimeout(() => {
+                    e.target.classList.add("dragging");
+                }, 0);
+            }
+        });
+
+        templateList.addEventListener("dragend", e => {
+            if (draggedItem) {
+                draggedItem.classList.remove("dragging");
+                draggedItem = null;
+            }
+        });
+
+        templateList.addEventListener("dragover", e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(templateList, e.clientY);
+            const currentOver = templateList.querySelector(".over");
+            if (currentOver) {
+                currentOver.classList.remove("over");
+            }
+            if (afterElement == null) {
+                if (draggedItem !== templateList.lastChild) {
+                    templateList.lastChild.classList.add("over");
+                }
+            } else {
+                if (draggedItem !== afterElement) {
+                    afterElement.classList.add("over");
+                }
+            }
+        });
+
+        templateList.addEventListener("drop", e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(templateList, e.clientY);
+            const currentOver = templateList.querySelector(".over");
+            if (currentOver) {
+                currentOver.classList.remove("over");
+            }
+            if (draggedItem) {
+                if (afterElement == null) {
+                    templateList.appendChild(draggedItem);
+                } else {
+                    templateList.insertBefore(draggedItem, afterElement);
+                }
+
+                // Save the new order
+                const newOrder = Array.from(templateList.querySelectorAll(".template-item")).map(item => item.dataset.templateName);
+                saveTemplateOrder(newOrder);
+            }
+        });
+
+        // Helper function to determine drop position in the list
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll(".template-item:not(.dragging)")];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // --- Initialization ---
+
+        // Load the initial state of the application
+        function loadState() {
+            // Check for existing templates
+            let templatesExist = false;
+            for (let i = 0; i < localStorage.length; i++) {
+                if (localStorage.key(i).startsWith("shapeTemplate_")) {
+                    templatesExist = true;
+                    break;
+                }
+            }
+
+            // Migrate legacy state to default template if needed
+            if (!templatesExist && localStorage.getItem("shapeState")) {
+                localStorage.setItem(getTemplateKey("default"), localStorage.getItem("shapeState"));
+            }
+
+            // Load last viewed template or default
+            const lastViewed = localStorage.getItem("lastViewedTemplate") || "default";
+            loadTemplate(lastViewed);
+
+            // Load control panel state
+            loadControlPanelState();
+        }
+
+        // --- XML Export/Import ---
+        function exportTemplateToXML() {
+            const key = getTemplateKey(currentTemplate);
+            const state = JSON.parse(localStorage.getItem(key)) || [];
+
+            let xmlString = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+            xmlString += `<template name="${currentTemplate}">\n`;
+
+            state.forEach(box => {
+                xmlString += `  <box x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" `;
+                xmlString += `color="${box.color}" fontSize="${box.fontSize || 16}" `;
+                xmlString += `isWhite="${box.isWhite || false}" zIndex="${box.zIndex || 0}">\n`;
+                xmlString += `    <text>${escapeXML(box.text)}</text>\n`;
+                xmlString += `  </box>\n`;
+            });
+
+            xmlString += `</template>`;
+
+            // Create a downloadable file
+            const blob = new Blob([xmlString], { type: 'text/xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentTemplate}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showNotification(`Template "${currentTemplate}" exported`);
+        }
+
+        // Helper function to escape XML special characters
+        function escapeXML(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        }
+
+        // Import a template from an XML file
+        function importTemplateFromXML(file) {
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+
+                    const parserError = xmlDoc.querySelector("parsererror");
+                    if (parserError) {
+                        throw new Error("XML parsing error");
+                    }
+
+                    const templateName = xmlDoc.documentElement.getAttribute("name") || "imported_template";
+
+                    const boxes = [];
+                    const boxElements = xmlDoc.getElementsByTagName("box");
+
+                    for (let i = 0; i < boxElements.length; i++) {
+                        const boxElement = boxElements[i];
+
+                        const textElement = boxElement.getElementsByTagName("text")[0];
+                        const text = textElement ? textElement.textContent : "";
+
+                        boxes.push({
+                            x: parseInt(boxElement.getAttribute("x")) || 100,
+                            y: parseInt(boxElement.getAttribute("y")) || 100,
+                            width: parseInt(boxElement.getAttribute("width")) || 200,
+                            height: parseInt(boxElement.getAttribute("height")) || 200,
+                            color: boxElement.getAttribute("color") || "rgba(173, 216, 230, 1)",
+                            fontSize: parseInt(boxElement.getAttribute("fontSize")) || 16,
+                            isWhite: boxElement.getAttribute("isWhite") === "true",
+                            zIndex: parseInt(boxElement.getAttribute("zIndex")) || 0,
+                            text: text
+                        });
+                    }
+
+                    // Save and load the imported template
+                    currentTemplate = templateName;
+                    localStorage.setItem(getTemplateKey(templateName), JSON.stringify(boxes));
+
+                    clearAllBoxes();
+                    loadBoxesFromState(boxes);
+
+                    updateTemplateList();
+
+                    showNotification(`Template "${templateName}" imported successfully`);
+
+                } catch (error) {
+                    console.error("Import error:", error);
+                    alert("Error importing template. Please check if the XML file is valid.");
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        // Show a temporary notification message
+        function showNotification(message) {
+            notificationArea.textContent = message;
+            notificationArea.classList.add("notification-visible");
+
+            setTimeout(() => {
+                notificationArea.classList.remove("notification-visible");
+            }, 3000);
+        }
+
+        // Convert an RGB color string to a HEX string
+        function rgbToHex(rgb) {
+            const result = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgb);
+            return result ? "#" +
+                (1 << 24 | result[1] << 16 | result[2] << 8 | result[3] << 0).toString(16).slice(1) : rgb;
+        }
+
+        // --- Keyboard Shortcuts ---
+        document.addEventListener("keydown", (e) => {
+            // Ignore keyboard events when typing in inputs
+            if (e.target.tagName === "INPUT") return;
+
+            if (e.key === "Delete") {
+                deleteSelectedBox();
+            } else if (e.key === "d" && e.ctrlKey) {
+                e.preventDefault(); // Prevent browser's "Bookmark this page" shortcut
+                duplicateBox();
+            }
+        });
+
+        // --- Control Panel Event Listeners ---
+
+        // Update box properties when control panel inputs change
+        [inputX, inputY, inputWidth, inputHeight].forEach(input => {
+            input.addEventListener("input", () => {
+                if (!selectedBox) return;
+                selectedBox.style.left = `${parseInt(inputX.value)}px`;
+                selectedBox.style.top = `${parseInt(inputY.value)}px`;
+                selectedBox.style.width = `${parseInt(inputWidth.value)}px`;
+                selectedBox.style.height = `${parseInt(inputHeight.value)}px`;
+                saveState();
+            });
+        });
+
+        inputText.addEventListener("input", () => {
+            if (!selectedBox) return;
+            const textInput = selectedBox.querySelector(".textbox");
+            textInput.value = inputText.value;
+            saveState();
+        });
+
+        // Color controls
+        inputColor.addEventListener("input", () => {
+            updateColorPreview();
+            if (selectedBox) {
+                applyColorToBox(selectedBox);
+                saveState();
+            }
+        });
+
+        opacityControl.addEventListener("input", () => {
+            currentOpacity = opacityControl.value;
+            opacityValue.textContent = `${currentOpacity}%`;
+            updateColorPreview();
+            if (selectedBox) {
+                applyColorToBox(selectedBox);
+                saveState();
+            }
+        });
+
+        // Initialize color preview on load
+        updateColorPreview();
+
+        // Font size controls
+        inputFontSize.addEventListener("input", () => {
+            if (!selectedBox) return;
+            const textInput = selectedBox.querySelector(".textbox");
+            const newSize = parseInt(inputFontSize.value) || 16;
+            textInput.style.fontSize = `${newSize}px`;
+            saveState();
+        });
+
+        decreaseFontBtn.addEventListener("click", () => {
+            if (!selectedBox) return;
+            const textInput = selectedBox.querySelector(".textbox");
+            const currentSize = parseInt(textInput.style.fontSize) || 16;
+            const newSize = Math.max(8, currentSize - 2);
+            textInput.style.fontSize = `${newSize}px`;
+            inputFontSize.value = newSize;
+            saveState();
+        });
+
+        increaseFontBtn.addEventListener("click", () => {
+            if (!selectedBox) return;
+            const textInput = selectedBox.querySelector(".textbox");
+            const currentSize = parseInt(textInput.style.fontSize) || 16;
+            const newSize = Math.min(72, currentSize + 2);
+            textInput.style.fontSize = `${newSize}px`;
+            inputFontSize.value = newSize;
+            saveState();
+        });
+
+        // Box management buttons
+        addBoxBtn.addEventListener("click", () => createBox());
+        duplicateBoxBtn.addEventListener("click", duplicateBox);
+        resizerToggle.addEventListener("change", updateResizerVisibility);
+
+        // Z-index buttons
+        bringForwardBtn.addEventListener("click", () => {
+            if (selectedBox) {
+                selectedBox.style.zIndex = zIndexCounter++;
+                saveState();
+            }
+        });
+
+        sendBackwardBtn.addEventListener("click", () => {
+            if (selectedBox) {
+                const boxes = Array.from(document.querySelectorAll(".box"));
+                if (boxes.length < 2) return;
+
+                const minZ = Math.min(...boxes.map(b => parseInt(b.style.zIndex) || 0));
+                selectedBox.style.zIndex = minZ - 1;
+                saveState();
+            }
+        });
+
+        // Template management buttons
+        saveTemplateBtn.addEventListener("click", saveTemplate);
+        clearAllBtn.addEventListener("click", () => {
+            if (confirm("Are you sure you want to clear all boxes?")) {
+                clearAllBoxes();
+                saveState();
+            }
+        });
+
+        // Export/Import buttons
+        exportBtn.addEventListener("click", exportTemplateToXML);
+        importBtn.addEventListener("click", () => importFileInput.click());
+        importFileInput.addEventListener("change", (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                importTemplateFromXML(file);
+                // Reset file input to allow importing the same file again
+                e.target.value = "";
+            }
+        });
+
+        // Initial setup on page load
+        loadState();
+        applyTransform(); // Apply initial transform
+
+        // --- Print Handling ---
+        let originalPrintState = {};
+
+        window.addEventListener('beforeprint', () => {
+            // Save current view state
+            originalPrintState = { panX, panY, scale };
+
+            const boxes = Array.from(document.querySelectorAll(".box"));
+            if (boxes.length === 0) return;
+
+            // Calculate bounding box of all shapes
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+            boxes.forEach(box => {
+                minX = Math.min(minX, box.offsetLeft);
+                minY = Math.min(minY, box.offsetTop);
+                maxX = Math.max(maxX, box.offsetLeft + box.offsetWidth);
+                maxY = Math.max(maxY, box.offsetTop + box.offsetHeight);
+            });
+
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+
+            if (contentWidth <= 0 || contentHeight <= 0) return;
+
+            // Calculate scale and pan to fit all content on the page
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            const padding = 40; // pixels
+            const effectiveWidth = viewportWidth - padding * 2;
+            const effectiveHeight = viewportHeight - padding * 2;
+
+            const newScale = Math.min(effectiveWidth / contentWidth, effectiveHeight / contentHeight);
+
+            scale = newScale;
+            panX = -minX * scale + (viewportWidth - contentWidth * scale) / 2;
+            panY = -minY * scale + (viewportHeight - contentHeight * scale) / 2;
+
+            applyTransform();
+        });
+
+        window.addEventListener('afterprint', () => {
+            // Restore original view state after printing
+            if (originalPrintState) {
+                panX = originalPrintState.panX;
+                panY = originalPrintState.panY;
+                scale = originalPrintState.scale;
+                applyTransform();
+            }
+        });
+    </script>
+</body>
+</html>
